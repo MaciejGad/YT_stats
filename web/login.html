@@ -8,9 +8,25 @@
 <link rel="stylesheet" href="/yt/style.css">
 </head>
 <body>
-<!-- Tymczasowy szablon; właściwy formularz powstaje w krokach 3 i 4 planu. -->
+<!-- Tymczasowy wygląd; projekt formularza powstaje w kroku 4 planu. -->
 <main>
   <h1>Logowanie</h1>
+  {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
+  <form method="post" action="/yt/login">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <p>
+      <label for="username">Nazwa użytkownika</label><br>
+      <input id="username" name="username" autocomplete="username" maxlength="64" required autofocus>
+    </p>
+    <p>
+      <label for="password">Hasło</label><br>
+      <input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+    </p>
+    <p>
+      <label><input type="checkbox" name="remember" value="1"> Zapamiętaj mnie na 90 dni</label>
+    </p>
+    <button type="submit">Zaloguj</button>
+  </form>
 </main>
 </body>
 </html>

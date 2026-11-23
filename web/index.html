@@ -11,6 +11,12 @@
 <!-- Tymczasowy szablon; właściwy panel powstaje w kroku 4 planu. -->
 <main>
   <h1>YarnPower</h1>
+  {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
+  <p>Jesteś zalogowany. Statystyki pojawią się w kroku 4.</p>
+  <form method="post" action="/yt/logout">
+    <input type="hidden" name="csrf" value="{{.LogoutCSRF}}">
+    <button type="submit">Wyloguj</button>
+  </form>
 </main>
 <script src="/yt/script.js" defer></script>
 </body>

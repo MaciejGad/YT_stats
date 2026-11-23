@@ -4,6 +4,7 @@
 //
 //	yt-stats [-config ścieżka]                 uruchamia serwer
 //	yt-stats hash-password                     tworzy hash Argon2id hasła
+//	yt-stats revoke-sessions [-config ścieżka] usuwa wszystkie sesje
 package main
 
 import (
@@ -22,6 +23,7 @@ import (
 
 	_ "time/tzdata" // strefy czasowe niezależne od systemu
 
+	"yt-stats/internal/auth"
 	"yt-stats/internal/config"
 	"yt-stats/internal/web"
 )
@@ -62,6 +64,8 @@ func run(ctx context.Context, args []string, e env) int {
 		switch args[0] {
 		case "hash-password":
 			return cmdHashPassword(args[1:], e.stdin, e.stdout, e.stderr)
+		case "revoke-sessions":
+			return cmdRevokeSessions(args[1:], e)
 		case "version":
 			fmt.Fprintln(e.stdout, version)
 			return 0
@@ -79,6 +83,8 @@ func usage(w io.Writer) {
 Użycie:
   yt-stats [-config ścieżka]   uruchamia serwer (domyślnie %s)
   yt-stats hash-password       tworzy hash Argon2id hasła do pola password_hash
+  yt-stats revoke-sessions [-config ścieżka]
+                               usuwa wszystkie sesje (przy zatrzymanej usłudze)
   yt-stats version             wypisuje wersję
 `, version, defaultConfigPath)
 }
@@ -111,15 +117,73 @@ func cmdServe(ctx context.Context, args []string, e env) int {
 		return 1
 	}
 
+	hash, err := auth.ParseHash(cfg.PasswordHash)
+	if err != nil { // walidacja konfiguracji już to sprawdziła
+		fmt.Fprintf(e.stderr, "password_hash: %v\n", err)
+		return 1
+	}
+	authenticator, err := auth.NewAuthenticator(cfg.Username, hash, auth.AuthOptions{})
+	if err != nil {
+		fmt.Fprintf(e.stderr, "weryfikacja hasła: %v\n", err)
+		return 1
+	}
+
+	sessions, err := auth.OpenStore(cfg.SessionFile, auth.StoreOptions{Log: log})
+	if err != nil {
+		fmt.Fprintf(e.stderr, "plik sesji %s: %v\n", cfg.SessionFile, err)
+		return 1
+	}
+	defer sessions.Close()
+
 	ln, err := e.listen("tcp", cfg.Listen)
 	if err != nil {
 		fmt.Fprintf(e.stderr, "nasłuch na %s: %v\n", cfg.Listen, err)
 		return 1
 	}
 
-	if err := serve(ctx, ln, web.NewHandler(files, log), log); err != nil {
+	h := web.NewHandler(web.Deps{
+		Files:    files,
+		Log:      log,
+		Sessions: sessions,
+		PreLogin: auth.NewPreLogin(0, 0, nil),
+		Auth:     authenticator,
+		Limiter:  auth.NewLimiter(auth.LimiterOptions{}),
+	})
+	log.Info("wczytano sesje", "active", sessions.Len())
+	if err := serve(ctx, ln, h, log); err != nil {
 		return 1
 	}
+	return 0
+}
+
+// cmdRevokeSessions usuwa wszystkie sesje. Działa tylko przy zatrzymanej
+// usłudze, bo usługa trzyma blokadę pliku sesji.
+func cmdRevokeSessions(args []string, e env) int {
+	fs := flag.NewFlagSet("revoke-sessions", flag.ContinueOnError)
+	fs.SetOutput(e.stderr)
+	configPath := fs.String("config", defaultConfigPath, "ścieżka pliku konfiguracji")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(e.stderr, "revoke-sessions: nieoczekiwany argument %q\n", fs.Arg(0))
+		return 2
+	}
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		fmt.Fprintf(e.stderr, "%s: %v\n", *configPath, err)
+		return 1
+	}
+	n, err := auth.RevokeAll(cfg.SessionFile, auth.StoreOptions{})
+	if errors.Is(err, auth.ErrLocked) {
+		fmt.Fprintln(e.stderr, "revoke-sessions: usługa działa i trzyma plik sesji; zatrzymaj ją (systemctl stop yt-stats) i spróbuj ponownie")
+		return 1
+	}
+	if err != nil {
+		fmt.Fprintf(e.stderr, "revoke-sessions: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(e.stdout, "Usunięto sesje: %d\n", n)
 	return 0
 }
 

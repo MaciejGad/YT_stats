@@ -300,13 +300,14 @@ func TestServeStartsAndStops(t *testing.T) {
 		t.Fatal("serwer nie otworzył gniazda w 5 s")
 	}
 
-	resp, err := http.Get("http://" + ln.Addr().String() + "/yt/")
+	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := noRedirect.Get("http://" + ln.Addr().String() + "/yt/")
 	if err != nil {
 		t.Fatalf("żądanie do działającego serwera: %v", err)
 	}
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusNotFound { // krok 1: brak tras
-		t.Errorf("status %d, oczekiwano 404", resp.StatusCode)
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/yt/login" {
+		t.Errorf("bez sesji: status %d Location %q, oczekiwano 303 /yt/login", resp.StatusCode, resp.Header.Get("Location"))
 	}
 
 	cancel()
@@ -459,5 +460,93 @@ func TestNewServerLimits(t *testing.T) {
 	}
 	if srv.MaxHeaderBytes != 16<<10 {
 		t.Errorf("MaxHeaderBytes = %d, oczekiwano %d", srv.MaxHeaderBytes, 16<<10)
+	}
+}
+
+// --- revoke-sessions ---
+
+func sessionFileOf(t *testing.T, configPath string) string {
+	t.Helper()
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg map[string]string
+	json.Unmarshal(data, &cfg)
+	return cfg["session_file"]
+}
+
+func TestRevokeSessions(t *testing.T) {
+	path := writeValidConfig(t, "../../web")
+	store, err := auth.OpenStore(sessionFileOf(t, path), auth.StoreOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, _ := store.Create(true)
+	store.Create(false)
+	store.Close()
+
+	e, out, errOut := testEnv("")
+	if code := run(context.Background(), []string{"revoke-sessions", "-config", path}, e); code != 0 {
+		t.Fatalf("kod %d: %s", code, errOut)
+	}
+	if !strings.Contains(out.String(), "Usunięto sesje: 2") {
+		t.Errorf("wyjście: %s", out)
+	}
+	store, _ = auth.OpenStore(sessionFileOf(t, path), auth.StoreOptions{})
+	defer store.Close()
+	if _, ok := store.Lookup(token); ok {
+		t.Error("sesja przetrwała revoke-sessions")
+	}
+}
+
+func TestRevokeSessionsWhileRunning(t *testing.T) {
+	path := writeValidConfig(t, "../../web")
+	store, err := auth.OpenStore(sessionFileOf(t, path), auth.StoreOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	token, _, _ := store.Create(true)
+
+	e, _, errOut := testEnv("")
+	if code := run(context.Background(), []string{"revoke-sessions", "-config", path}, e); code != 1 {
+		t.Fatalf("kod %d, oczekiwano 1", code)
+	}
+	if !strings.Contains(errOut.String(), "zatrzymaj") {
+		t.Errorf("komunikat powinien radzić zatrzymanie usługi: %s", errOut)
+	}
+	if _, ok := store.Lookup(token); !ok {
+		t.Error("sesja zniknęła mimo odmowy")
+	}
+}
+
+func TestRevokeSessionsBadArgs(t *testing.T) {
+	e, _, _ := testEnv("")
+	if code := run(context.Background(), []string{"revoke-sessions", "-x"}, e); code != 2 {
+		t.Errorf("nieznana flaga: kod %d", code)
+	}
+	if code := run(context.Background(), []string{"revoke-sessions", "nadmiarowy"}, e); code != 2 {
+		t.Errorf("nadmiarowy argument: kod %d", code)
+	}
+	if code := run(context.Background(), []string{"revoke-sessions", "-config", filepath.Join(t.TempDir(), "brak.json")}, e); code != 1 {
+		t.Errorf("brak konfiguracji: kod %d", code)
+	}
+}
+
+func TestSecondInstanceRefusesSessionFile(t *testing.T) {
+	path := writeValidConfig(t, "../../web")
+	store, err := auth.OpenStore(sessionFileOf(t, path), auth.StoreOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	e, _, errOut := testEnv("")
+	if code := run(context.Background(), []string{"-config", path}, e); code != 1 {
+		t.Fatalf("kod %d, oczekiwano 1", code)
+	}
+	if !strings.Contains(errOut.String(), "zablokowany") {
+		t.Errorf("stderr: %s", errOut)
 	}
 }
