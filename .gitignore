@@ -1,0 +1,9 @@
+# Stara implementacja PHP — tylko podgląd, zawiera sekrety
+old_implementation/
+
+# Binarka i lokalna konfiguracja
+/yt-stats
+/config.json
+/data/
+
+.DS_Store

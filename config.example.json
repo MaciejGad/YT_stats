@@ -1,0 +1,10 @@
+{
+  "listen": "127.0.0.1:8091",
+  "channel_id": "",
+  "api_key": "",
+  "api_key_fallback": "",
+  "username": "",
+  "password_hash": "",
+  "session_file": "",
+  "web_dir": "web"
+}
