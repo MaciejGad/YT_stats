@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"yt-stats/internal/auth"
+	"yt-stats/internal/stats"
 )
 
 // Nazwy i parametry ciasteczek.
@@ -38,6 +40,12 @@ type Deps struct {
 	PreLogin *auth.PreLogin
 	Auth     *auth.Authenticator
 	Limiter  *auth.Limiter
+	Stats    StatsSource
+}
+
+// StatsSource dostarcza dane do /yt/stat.json. Implementuje go *stats.Cache.
+type StatsSource interface {
+	Get(ctx context.Context) (*stats.Payload, error)
 }
 
 type server struct {
@@ -53,7 +61,11 @@ func NewHandler(d Deps) http.Handler {
 	mux.HandleFunc("GET /yt/login", s.handleLoginForm)
 	mux.HandleFunc("POST /yt/login", s.handleLogin)
 	mux.HandleFunc("POST /yt/logout", s.handleLogout)
-	return mux
+	mux.HandleFunc("GET /yt/stat.json", s.handleStats)
+	for _, name := range StaticNames {
+		mux.HandleFunc("GET /yt/"+name, s.handleStatic(name))
+	}
+	return securityHeaders(mux)
 }
 
 // --- dane szablonów ---

@@ -39,6 +39,7 @@ type app struct {
 	sessions *auth.Store
 	logs     *syncBuffer
 	deps     Deps
+	stats    *fakeStats
 }
 
 var fastParams = auth.Params{Memory: 8 * 1024, Time: 1, Threads: 1, SaltLen: 16, KeyLen: 32}
@@ -69,7 +70,9 @@ func newApp(t *testing.T, params auth.Params, ao auth.AuthOptions) *app {
 	}
 	t.Cleanup(func() { store.Close(); os.Chmod(dir, 0o700) })
 
+	fs := &fakeStats{}
 	d := Deps{
+		Stats:    fs,
 		Files:    files,
 		Log:      log,
 		Sessions: store,
@@ -77,7 +80,7 @@ func newApp(t *testing.T, params auth.Params, ao auth.AuthOptions) *app {
 		Auth:     a,
 		Limiter:  auth.NewLimiter(auth.LimiterOptions{Now: clk.Now}),
 	}
-	return &app{t: t, handler: NewHandler(d), clock: clk, dir: dir, sessions: store, logs: logs, deps: d}
+	return &app{t: t, handler: NewHandler(d), clock: clk, dir: dir, sessions: store, logs: logs, deps: d, stats: fs}
 }
 
 // restart symuluje restart procesu: nowy magazyn z tego samego pliku.

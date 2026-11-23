@@ -18,7 +18,7 @@ import (
 // Pliki wymagane w katalogu web_dir.
 var (
 	TemplateNames = []string{"index.html", "login.html"}
-	StaticNames   = []string{"script.js", "style.css", "favicon.svg"}
+	StaticNames   = []string{"script.js", "style.css", "logo.png", "favicon.png"}
 )
 
 // maxFileSize ogranicza rozmiar pojedynczego pliku interfejsu.

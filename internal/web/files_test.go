@@ -41,7 +41,8 @@ func setupDir(t *testing.T) string {
 		"login.html":  `<p>logowanie</p>`,
 		"script.js":   `console.log(1);`,
 		"style.css":   `body{}`,
-		"favicon.svg": `<svg/>`,
+		"logo.png":    "\x89PNG logo",
+		"favicon.png": "\x89PNG ikona",
 	}
 	for name, content := range files {
 		write(t, dir, name, content, time.Now().Add(-time.Hour))

@@ -2,31 +2,38 @@
 <html lang="pl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>Logowanie — YarnPower</title>
-<link rel="icon" href="/yt/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/yt/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/yt/logo.png">
 <link rel="stylesheet" href="/yt/style.css">
 </head>
-<body>
-<!-- Tymczasowy wygląd; projekt formularza powstaje w kroku 4 planu. -->
-<main>
-  <h1>Logowanie</h1>
-  {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
-  <form method="post" action="/yt/login">
-    <input type="hidden" name="csrf" value="{{.CSRF}}">
-    <p>
-      <label for="username">Nazwa użytkownika</label><br>
-      <input id="username" name="username" autocomplete="username" maxlength="64" required autofocus>
-    </p>
-    <p>
-      <label for="password">Hasło</label><br>
-      <input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required>
-    </p>
-    <p>
-      <label><input type="checkbox" name="remember" value="1"> Zapamiętaj mnie na 90 dni</label>
-    </p>
-    <button type="submit">Zaloguj</button>
-  </form>
+<body class="login-body">
+<main class="login">
+  <div class="login-card">
+    <div class="login-head">
+      <img class="login-logo" src="/yt/logo.png" alt="YarnPower" width="160" height="148">
+      <p class="brand-sub">Zaloguj się, aby zobaczyć statystyki kanału.</p>
+    </div>
+    {{if .Error}}<div class="banner banner-error" role="alert">{{.Error}}</div>{{end}}
+    <form method="post" action="/yt/login" class="form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <div class="field">
+        <label for="username">Nazwa użytkownika</label>
+        <input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" required autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Hasło</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+      </div>
+      <label class="check">
+        <input type="checkbox" name="remember" value="1">
+        <span>Zapamiętaj mnie na 90 dni</span>
+      </label>
+      <button class="btn btn-primary btn-block" type="submit">Zaloguj</button>
+    </form>
+  </div>
 </main>
 </body>
 </html>

@@ -19,8 +19,9 @@ Katalog `old_implementation/` zawiera kopię starej wersji wyłącznie do podgl�
 
 - Interfejs jest odnowiony i wyraźnie nowocześniejszy niż obecna strona. Cały tekst jest po polsku, dokument ma `lang="pl"`.
 - Strona działa bez poziomego przewijania na szerokościach od 360 px. Sprawdzamy ją na 375 px (telefon), 768 px (tablet) i 1280 px (komputer) oraz na prawdziwym telefonie.
-- Nagłówek zawiera nazwę kanału, czas pobrania, przycisk „Odśwież” i przycisk „Wyloguj”.
-- Podsumowanie ma postać kafelków: subskrybenci, wyświetlenia kanału i liczba filmów na liście.
+- Kolejność od góry: nagłówek z logo YarnPower i przyciskiem „Wyloguj”, lista filmów, a pod nią mniejszy panel podsumowania.
+- Panel podsumowania pokazuje subskrybentów, wyświetlenia kanału, liczbę filmów na liście, czas pobrania i przycisk „Odśwież”. Jest przyklejony do dołu ekranu (nie przewija się z listą), a na końcu strony zajmuje swoje miejsce pod listą.
+- Kolorystyka nawiązuje do logo i włóczki: granat logo, żółć kłębka i ciepłe, wełniane tło. Logo ma przezroczyste tło i wygląda dobrze w obu motywach.
 - Od 768 px lista filmów jest tabelą z kolumnami „Tytuł” i „Wyświetlenia”; liczby są wyrównane do prawej cyframi o stałej szerokości. Poniżej 768 px każdy film jest wierszem-kartą z tytułem i liczbą wyświetleń pod nim.
 - Domyślna kolejność to kolejność playlisty przesłanych filmów (najnowsze na górze). Użytkownik może przełączyć sortowanie po liczbie wyświetleń malejąco. Sortowanie działa w przeglądarce i nie wysyła nowego żądania.
 - Liczby są formatowane w przeglądarce według `pl-PL` (np. `12 345`). JSON pozostaje ciągiem cyfr.
@@ -83,7 +84,7 @@ Katalog `old_implementation/` zawiera kopię starej wersji wyłącznie do podgl�
 | `POST /yt/login` | Weryfikacja hasła, utworzenie sesji i `303` do `/yt/` po sukcesie. |
 | `POST /yt/logout` | Unieważnienie sesji i `303` do `/yt/login`. |
 | `GET /yt/stat.json` | Statystyki lub `401` przy braku ważnej sesji. |
-| `GET /yt/script.js`, `GET /yt/style.css`, `GET /yt/favicon.svg` | Pliki statyczne, dostępne bez sesji. |
+| `GET /yt/script.js`, `GET /yt/style.css`, `GET /yt/logo.png`, `GET /yt/favicon.png` | Pliki statyczne, dostępne bez sesji. |
 
 - Każda trasa `GET` obsługuje też `HEAD`. Inna metoda na znanej ścieżce zwraca `405` z nagłówkiem `Allow`. Nieznana ścieżka zwraca `404`.
 - JSON zachowuje dotychczasowe pola `stats.subscriberCount`, `stats.viewsCount`, `videos[].videoId`, `videos[].title`, `videos[].viewCount` i `update_time`. Liczniki pozostają ciągami cyfr. Brak licznika reprezentuje `null`. Pole `stale` informuje, czy wynik pochodzi z odczytu awaryjnego.
@@ -93,7 +94,7 @@ Katalog `old_implementation/` zawiera kopię starej wersji wyłącznie do podgl�
 
 ### Pliki interfejsu
 
-- Aplikacja to jedna binarka Go. Szablony HTML (`index.html`, `login.html`) oraz pliki `script.js`, `style.css` i `favicon.svg` leżą obok niej w katalogu wskazanym w konfiguracji (`web_dir`) i nie są wkompilowane.
+- Aplikacja to jedna binarka Go. Szablony HTML (`index.html`, `login.html`) oraz pliki `script.js`, `style.css`, `logo.png` i `favicon.png` leżą obok niej w katalogu wskazanym w konfiguracji (`web_dir`) i nie są wkompilowane.
 - Zmiana tych plików działa bez rekompilacji i bez restartu: aplikacja wczytuje szablon ponownie, gdy zmieni się czas modyfikacji pliku. Jeżeli nowa wersja szablonu ma błąd składni, aplikacja loguje błąd i dalej używa ostatniej poprawnej wersji.
 - Przy starcie brak lub błąd któregokolwiek pliku przerywa uruchomienie z komunikatem wskazującym plik.
 

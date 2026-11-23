@@ -2,22 +2,91 @@
 <html lang="pl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>YarnPower — statystyki</title>
-<link rel="icon" href="/yt/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/yt/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/yt/logo.png">
 <link rel="stylesheet" href="/yt/style.css">
 </head>
 <body>
-<!-- Tymczasowy szablon; właściwy panel powstaje w kroku 4 planu. -->
-<main>
-  <h1>YarnPower</h1>
-  {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
-  <p>Jesteś zalogowany. Statystyki pojawią się w kroku 4.</p>
-  <form method="post" action="/yt/logout">
-    <input type="hidden" name="csrf" value="{{.LogoutCSRF}}">
-    <button type="submit">Wyloguj</button>
-  </form>
-</main>
+<div class="page">
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-logo" src="/yt/logo.png" alt="YarnPower" width="80" height="74">
+      <div class="brand-text">
+        <h1 class="brand-name">Statystyki kanału</h1>
+        <p class="brand-sub"><a href="https://www.youtube.com/@YarnPowerPL" target="_blank" rel="noopener noreferrer">@YarnPowerPL</a> na YouTube</p>
+      </div>
+    </div>
+    <form method="post" action="/yt/logout">
+      <input type="hidden" name="csrf" value="{{.LogoutCSRF}}">
+      <button class="btn btn-ghost" type="submit">Wyloguj</button>
+    </form>
+  </header>
+
+  <main>
+    {{if .Error}}<div class="banner banner-error" role="alert">{{.Error}}</div>{{end}}
+    <div id="status" class="banner" role="status" aria-live="polite" hidden>
+      <span id="status-text"></span>
+      <button id="status-retry" class="btn btn-small" type="button" hidden>Spróbuj ponownie</button>
+    </div>
+
+    <section class="card" aria-labelledby="videos-title">
+      <div class="card-head">
+        <h2 id="videos-title">Filmy</h2>
+        <div class="segmented" role="group" aria-label="Kolejność filmów">
+          <button type="button" data-sort="playlist" aria-pressed="true">Najnowsze</button>
+          <button type="button" data-sort="views" aria-pressed="false">Najpopularniejsze</button>
+        </div>
+      </div>
+      <table class="videos" id="videos">
+        <caption class="visually-hidden">Filmy na kanale i liczba ich wyświetleń</caption>
+        <thead>
+          <tr>
+            <th scope="col" class="col-rank">#</th>
+            <th scope="col">Tytuł</th>
+            <th scope="col" class="col-num">Wyświetlenia</th>
+          </tr>
+        </thead>
+        <tbody id="video-rows">
+          <tr class="row-skeleton"><td class="col-rank"><span class="skeleton"></span></td><td><span class="skeleton skeleton-title"></span></td><td class="col-num"><span class="skeleton"></span></td></tr>
+          <tr class="row-skeleton"><td class="col-rank"><span class="skeleton"></span></td><td><span class="skeleton skeleton-title"></span></td><td class="col-num"><span class="skeleton"></span></td></tr>
+          <tr class="row-skeleton"><td class="col-rank"><span class="skeleton"></span></td><td><span class="skeleton skeleton-title"></span></td><td class="col-num"><span class="skeleton"></span></td></tr>
+        </tbody>
+      </table>
+      <p id="empty" class="empty" hidden>Na kanale nie ma jeszcze publicznych filmów.</p>
+    </section>
+
+    <noscript><div class="banner banner-error">Panel wymaga włączonej obsługi JavaScriptu.</div></noscript>
+  </main>
+
+  <aside class="dock" aria-label="Podsumowanie kanału">
+    <dl class="dock-stats">
+      <div class="stat">
+        <dt>Subskrybenci</dt>
+        <dd id="subscribers"><span class="skeleton"></span></dd>
+      </div>
+      <div class="stat">
+        <dt>Wyświetlenia</dt>
+        <dd id="views"><span class="skeleton"></span></dd>
+      </div>
+      <div class="stat">
+        <dt>Filmy</dt>
+        <dd id="video-count"><span class="skeleton"></span></dd>
+      </div>
+    </dl>
+    <p class="dock-time">
+      <span>Pobrano</span>
+      <time id="update-time">—</time>
+      <span id="stale-badge" class="badge" hidden>z pamięci podręcznej</span>
+    </p>
+    <button id="refresh" class="btn btn-yarn dock-refresh" type="button" disabled>
+      <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="btn-label">Odśwież</span>
+    </button>
+  </aside>
+</div>
 <script src="/yt/script.js" defer></script>
 </body>
 </html>

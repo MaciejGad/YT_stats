@@ -11,7 +11,7 @@ internal/youtube/    klient API, paginacja, zapasowy klucz
 internal/stats/      cache, single-flight, stan awaryjny
 internal/auth/       Argon2id, sesje, plik sesji, CSRF, limiter
 internal/web/        handlery HTTP, nagłówki, ładowanie plików z web_dir
-web/                 index.html, login.html, script.js, style.css, favicon.svg
+web/                 index.html, login.html, script.js, style.css, logo.png, favicon.png
 deploy/              yt-stats.service, przykład konfiguracji Nginx
 config.example.json  przykładowa konfiguracja z pustymi wartościami
 ```
@@ -92,10 +92,10 @@ config.example.json  przykładowa konfiguracja z pustymi wartościami
 
 ## 4. Zbuduj panel i handlery HTTP
 
-- Zaprojektuj od nowa `web/index.html`, `web/login.html`, `web/style.css`, `web/script.js` i `web/favicon.svg` według sekcji „Wygląd i responsywność” w wymaganiach. Ze starej wersji bierzemy tylko zakres danych; obsługę błędów i nieużywany kod wykresów piszemy od nowa albo pomijamy. Bez `setInterval`, bez zasobów zewnętrznych, bez skryptów i stylów inline (CSP).
+- Zaprojektuj od nowa `web/index.html`, `web/login.html`, `web/style.css`, `web/script.js`, `web/logo.png` i `web/favicon.png` według sekcji „Wygląd i responsywność” w wymaganiach. Ze starej wersji bierzemy tylko zakres danych; obsługę błędów i nieużywany kod wykresów piszemy od nowa albo pomijamy. Bez `setInterval`, bez zasobów zewnętrznych, bez skryptów i stylów inline (CSP).
 - Skrypt pobiera `/yt/stat.json` przy wejściu i po kliknięciu „Odśwież”. Obsługuje ładowanie, pustą listę, dane awaryjne (`stale`), `503` i inne błędy z ponowieniem, błąd sieci oraz `401` (przekierowanie do logowania). Tytuły wstawia przez `textContent`, linki buduje wyłącznie z `videoId` (`https://www.youtube.com/watch?v=` + `encodeURIComponent`), z `rel="noopener"`.
 - Liczby formatuje `Intl.NumberFormat('pl-PL')`, czas `Intl.DateTimeFormat('pl-PL', {timeZone: 'Europe/Warsaw'})`, `null` wyświetla jako „Niedostępne”. Sortowanie (kolejność playlisty / wyświetlenia malejąco) działa bez nowego żądania; „Niedostępne” trafia na koniec.
-- Zaimplementuj trasy z tabeli w wymaganiach z obsługą `HEAD`, `405` i `404`, middleware nagłówków bezpieczeństwa oraz `Cache-Control: no-store` dla stron logowania, panelu i `stat.json`. Pliki statyczne serwuj z `web_dir` z krótkim `Cache-Control` (np. `max-age=300`) i `ETag`.
+- Zaimplementuj trasy z tabeli w wymaganiach z obsługą `HEAD`, `405` i `404`, middleware nagłówków bezpieczeństwa oraz `Cache-Control: no-store` dla stron logowania, panelu i `stat.json`. Pliki statyczne serwuj z `web_dir` z `Cache-Control: no-cache` i `ETag`: przeglądarka przy każdym użyciu sprawdza zmianę (304, gdy brak), więc edycja pliku na serwerze jest widoczna po zwykłym przeładowaniu.
 - Ustaw limity czasu serwera HTTP z wymagań.
 
 **Testy jednostkowe** (`httptest`, atrapa klienta YouTube)
@@ -109,7 +109,7 @@ config.example.json  przykładowa konfiguracja z pustymi wartościami
 - Pliki: zmiana `web/script.js` w katalogu tymczasowym jest serwowana bez restartu; `ETag` zmienia się po zmianie pliku.
 
 **Testy przeglądarkowe skryptu** (opcjonalnie, `node --test` z atrapą DOM albo ręcznie)
-- Formatowanie liczb i daty, sortowanie z wartościami `null`, budowa linku z `videoId` zawierającego znaki specjalne.
+- Formatowanie liczb i daty, sortowanie z wartościami `null`, budowa linku z `videoId` zawierającego znaki specjalne. Uruchomienie: `node --test test/js/*.test.js`.
 
 **Scenariusze manualne** (`http://localhost:8091/yt/`, Chrome i Firefox)
 - Pierwsze wejście: stan ładowania, potem kafelki, lista i czas pobrania w czasie polskim; przy zmienionej strefie systemu (np. na `America/New_York`) czas dalej polski.

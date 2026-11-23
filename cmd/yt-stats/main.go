@@ -25,7 +25,9 @@ import (
 
 	"yt-stats/internal/auth"
 	"yt-stats/internal/config"
+	"yt-stats/internal/stats"
 	"yt-stats/internal/web"
+	"yt-stats/internal/youtube"
 )
 
 // version ustawia linker: -ldflags "-X main.version=...".
@@ -128,6 +130,17 @@ func cmdServe(ctx context.Context, args []string, e env) int {
 		return 1
 	}
 
+	yt, err := youtube.New(youtube.Options{
+		ChannelID:      cfg.ChannelID,
+		APIKey:         cfg.APIKey,
+		APIKeyFallback: cfg.APIKeyFallback,
+		Log:            log,
+	})
+	if err != nil {
+		fmt.Fprintf(e.stderr, "klient YouTube: %v\n", err)
+		return 1
+	}
+
 	sessions, err := auth.OpenStore(cfg.SessionFile, auth.StoreOptions{Log: log})
 	if err != nil {
 		fmt.Fprintf(e.stderr, "plik sesji %s: %v\n", cfg.SessionFile, err)
@@ -148,6 +161,7 @@ func cmdServe(ctx context.Context, args []string, e env) int {
 		PreLogin: auth.NewPreLogin(0, 0, nil),
 		Auth:     authenticator,
 		Limiter:  auth.NewLimiter(auth.LimiterOptions{}),
+		Stats:    stats.New(yt, stats.Options{Log: log}),
 	})
 	log.Info("wczytano sesje", "active", sessions.Len())
 	if err := serve(ctx, ln, h, log); err != nil {
