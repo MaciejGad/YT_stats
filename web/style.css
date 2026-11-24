@@ -1,6 +1,6 @@
-/* YarnPower — panel statystyk. Kolory z logo: granat, żółć kłębka,
-   błękit drutów; tło jak naturalna wełna. Bez zasobów zewnętrznych
-   (CSP: default-src 'self'). */
+/* YarnPower — statistics panel. Colours from the logo: navy, the yellow of
+   the ball of yarn, the blue of the needles; a background like natural wool.
+   No external resources (CSP: default-src 'self'). */
 
 :root {
   color-scheme: light;
@@ -99,7 +99,7 @@ h1, h2, p, dl, dd { margin: 0; }
   white-space: nowrap;
 }
 
-/* --- układ strony --- */
+/* --- page layout --- */
 
 .page {
   max-width: 1080px;
@@ -127,7 +127,7 @@ h1, h2, p, dl, dd { margin: 0; }
 .brand-sub { color: var(--muted); font-size: 0.9375rem; }
 .brand-sub a { font-weight: 600; }
 
-/* --- przyciski --- */
+/* --- buttons --- */
 
 .btn {
   display: inline-flex;
@@ -158,7 +158,7 @@ h1, h2, p, dl, dd { margin: 0; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* --- komunikaty --- */
+/* --- messages --- */
 
 .banner {
   display: flex;
@@ -187,7 +187,7 @@ h1, h2, p, dl, dd { margin: 0; }
   border: 1px solid var(--warn-border);
 }
 
-/* --- lista filmów --- */
+/* --- video list --- */
 
 .card {
   background: var(--surface);
@@ -266,7 +266,7 @@ h1, h2, p, dl, dd { margin: 0; }
 
 .empty { padding: 32px 18px; text-align: center; color: var(--muted); }
 
-/* --- panel podsumowania (przyklejony do dołu ekranu) --- */
+/* --- summary panel (stuck to the bottom of the screen) --- */
 
 .dock {
   position: sticky;
@@ -280,8 +280,8 @@ h1, h2, p, dl, dd { margin: 0; }
   border-radius: var(--radius);
   background: var(--dock-bg);
   color: var(--dock-text);
-  /* Pierwszy cień w kolorze tła zasłania szczelinę pod panelem,
-     żeby przewijana lista nie prześwitywała. */
+  /* The first shadow, in the background colour, covers the gap under the
+     panel so the scrolling list does not show through. */
   box-shadow: 0 12px 0 var(--bg), 0 8px 28px rgb(18 21 48 / 28%);
 }
 
@@ -314,7 +314,7 @@ h1, h2, p, dl, dd { margin: 0; }
 
 .dock-refresh { flex: none; }
 
-/* --- szkielety ładowania --- */
+/* --- loading skeletons --- */
 
 .skeleton {
   display: inline-block;
@@ -334,7 +334,7 @@ h1, h2, p, dl, dd { margin: 0; }
   .btn { transition: none; }
 }
 
-/* --- tablet: panel w dwóch rzędach --- */
+/* --- tablet: panel in two rows --- */
 
 @media (max-width: 899.98px) {
   .dock { flex-wrap: wrap; padding: 12px 14px 12px 18px; }
@@ -342,7 +342,7 @@ h1, h2, p, dl, dd { margin: 0; }
   .dock-time { justify-content: flex-start; }
 }
 
-/* --- telefon: karty zamiast tabeli, panel na całą szerokość --- */
+/* --- phone: cards instead of a table, full-width panel --- */
 
 @media (max-width: 767.98px) {
   .brand { gap: 10px; }
@@ -376,12 +376,12 @@ h1, h2, p, dl, dd { margin: 0; }
   .videos tr.row-skeleton td:nth-child(3)::after { content: ""; }
   .share { margin-top: 6px; }
 
-  /* Cała karta filmu jest klikalna, nie tylko tekst tytułu. */
+  /* The whole video card is clickable, not just the title text. */
   .video-link::after { content: ""; position: absolute; inset: 0; }
   .video-link:focus-visible { outline: none; }
   .videos tbody tr:has(.video-link:focus-visible) { outline: 3px solid var(--focus); outline-offset: -3px; }
 
-  /* Panel: liczby i okrągły przycisk w pierwszym rzędzie, czas pod spodem. */
+  /* Panel: numbers and a round button in the first row, the time below. */
   .dock {
     bottom: 0;
     margin: 16px calc(-1 * max(16px, env(safe-area-inset-left))) 0;
@@ -402,7 +402,7 @@ h1, h2, p, dl, dd { margin: 0; }
   .dock-refresh .btn-icon { width: 22px; height: 22px; }
 }
 
-/* --- logowanie --- */
+/* --- login --- */
 
 .login-body { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; }
 
@@ -434,7 +434,7 @@ h1, h2, p, dl, dd { margin: 0; }
   background: var(--surface-2);
   color: var(--text);
   font: inherit;
-  font-size: 1rem; /* bez powiększania na iOS */
+  font-size: 1rem; /* no zoom on iOS */
 }
 .field input:focus-visible { outline-offset: 0; border-color: var(--focus); }
 

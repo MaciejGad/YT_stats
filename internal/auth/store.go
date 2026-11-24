@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// Czasy życia sesji z wymagań, liczone od logowania.
+// Session lifetimes from the requirements, counted from login.
 const (
 	PersistentTTL = 90 * 24 * time.Hour
 	BrowserTTL    = 12 * time.Hour
@@ -27,11 +27,11 @@ const (
 	maxStoreFileSize   = 1 << 20
 )
 
-// ErrLocked oznacza, że plik sesji jest używany przez inny proces
-// (zwykle działającą usługę).
+// ErrLocked means that the session file is in use by another process
+// (usually the running service).
 var ErrLocked = errors.New("plik sesji jest zablokowany przez inny proces (czy usługa działa?)")
 
-// Session to dane sesji. Sam identyfikator nie jest przechowywany.
+// Session is the session data. The identifier itself is not stored.
 type Session struct {
 	Created    time.Time
 	Expires    time.Time
@@ -50,28 +50,28 @@ type fileSession struct {
 	Persistent bool      `json:"persistent"`
 }
 
-// StoreOptions konfiguruje magazyn. Zerowe pola dostają wartości domyślne.
+// StoreOptions configures the store. Zero fields get default values.
 type StoreOptions struct {
 	MaxSessions int
 	Now         func() time.Time
 	Log         *slog.Logger
 }
 
-// Store trzyma sesje w pamięci i w pliku JSON. Każda zmiana zapisuje cały
-// plik atomowo; stan w pamięci zmienia się dopiero po udanym zapisie.
-// Przez cały czas życia Store trzyma blokadę flock pliku <ścieżka>.lock.
+// Store keeps sessions in memory and in a JSON file. Every change writes the
+// whole file atomically; the in-memory state changes only after a successful write.
+// For its whole lifetime Store holds a flock lock on the file <path>.lock.
 type Store struct {
 	path string
 	opt  StoreOptions
 	lock *os.File
 
 	mu       sync.RWMutex
-	sessions map[string]fileSession // klucz: hash identyfikatora
+	sessions map[string]fileSession // key: hash of the identifier
 }
 
-// OpenStore blokuje i wczytuje plik sesji. Brak pliku oznacza brak sesji.
-// Uszkodzony lub za duży plik jest przenoszony obok z dopiskiem .corrupt-…,
-// a magazyn startuje pusty (wystarczy zalogować się ponownie).
+// OpenStore locks and reads the session file. A missing file means no sessions.
+// A corrupt or oversized file is moved aside with a .corrupt-… suffix,
+// and the store starts empty (logging in again is enough).
 func OpenStore(path string, o StoreOptions) (*Store, error) {
 	if o.MaxSessions == 0 {
 		o.MaxSessions = defaultMaxSessions
@@ -113,7 +113,7 @@ func acquireLock(path string) (*os.File, error) {
 	return f, nil
 }
 
-// Close zwalnia blokadę pliku.
+// Close releases the file lock.
 func (s *Store) Close() error {
 	if s.lock == nil {
 		return nil
@@ -181,7 +181,7 @@ func parseStore(data []byte) (map[string]fileSession, error) {
 	return out, nil
 }
 
-// Create tworzy sesję i zwraca jej identyfikator do ciasteczka.
+// Create creates a session and returns its identifier for the cookie.
 func (s *Store) Create(persistent bool) (string, Session, error) {
 	token, err := newToken()
 	if err != nil {
@@ -206,7 +206,7 @@ func (s *Store) Create(persistent bool) (string, Session, error) {
 	return token, toSession(fs), nil
 }
 
-// Lookup zwraca ważną sesję o podanym identyfikatorze. Nie przedłuża jej.
+// Lookup returns the valid session with the given identifier. It does not extend it.
 func (s *Store) Lookup(token string) (Session, bool) {
 	if !validToken(token) {
 		return Session{}, false
@@ -221,7 +221,7 @@ func (s *Store) Lookup(token string) (Session, bool) {
 	return toSession(fs), true
 }
 
-// Delete unieważnia sesję. Przy błędzie zapisu sesja pozostaje ważna.
+// Delete invalidates a session. If the write fails, the session stays valid.
 func (s *Store) Delete(token string) error {
 	if !validToken(token) {
 		return nil
@@ -241,7 +241,7 @@ func (s *Store) Delete(token string) error {
 	return nil
 }
 
-// Len zwraca liczbę ważnych sesji.
+// Len returns the number of valid sessions.
 func (s *Store) Len() int {
 	now := s.opt.Now()
 	s.mu.RLock()
@@ -255,7 +255,7 @@ func (s *Store) Len() int {
 	return n
 }
 
-// liveCopy zwraca kopię mapy bez wygasłych sesji. Wymaga blokady.
+// liveCopy returns a copy of the map without expired sessions. Requires the lock.
 func (s *Store) liveCopy(now time.Time) map[string]fileSession {
 	out := make(map[string]fileSession, len(s.sessions)+1)
 	for k, v := range s.sessions {
@@ -280,8 +280,8 @@ func trimOldest(m map[string]fileSession, max int) {
 	}
 }
 
-// persist zapisuje plik atomowo: plik tymczasowy w tym samym katalogu,
-// fsync, zmiana nazwy, fsync katalogu.
+// persist writes the file atomically: a temporary file in the same directory,
+// fsync, rename, fsync of the directory.
 func (s *Store) persist(m map[string]fileSession) error {
 	ff := fileFormat{Version: fileVersion, Sessions: make([]fileSession, 0, len(m))}
 	for _, v := range m {
@@ -335,8 +335,8 @@ func toSession(fs fileSession) Session {
 	return Session{Created: fs.Created, Expires: fs.Expires, Persistent: fs.Persistent}
 }
 
-// RevokeAll usuwa wszystkie sesje. Kończy się ErrLocked, gdy plik jest
-// używany przez działającą usługę. Zwraca liczbę usuniętych ważnych sesji.
+// RevokeAll removes all sessions. It fails with ErrLocked when the file is
+// in use by the running service. It returns the number of valid sessions removed.
 func RevokeAll(path string, o StoreOptions) (int, error) {
 	s, err := OpenStore(path, o)
 	if err != nil {

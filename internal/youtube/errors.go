@@ -7,14 +7,14 @@ import (
 	"unicode/utf8"
 )
 
-// maxMessageLen ogranicza długość komunikatu API w logach.
+// maxMessageLen limits the length of an API message in logs.
 const maxMessageLen = 200
 
-// APIError to odpowiedź API z kodem innym niż 200.
+// APIError is an API response with a status other than 200.
 type APIError struct {
 	Endpoint string
 	Status   int
-	Reason   string // np. quotaExceeded, keyInvalid, playlistNotFound
+	Reason   string // e.g. quotaExceeded, keyInvalid, playlistNotFound
 	Message  string
 }
 
@@ -29,7 +29,7 @@ func (e *APIError) Error() string {
 	return s
 }
 
-// quotaExhausted mówi, czy błąd oznacza wyczerpanie dziennego limitu klucza.
+// quotaExhausted says whether the error means the key's daily quota is exhausted.
 func (e *APIError) quotaExhausted() bool {
 	return e.Status == http.StatusForbidden && (e.Reason == "quotaExceeded" || e.Reason == "dailyLimitExceeded")
 }

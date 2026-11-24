@@ -1,4 +1,4 @@
-// Package auth obsługuje hasła, sesje, CSRF i limity logowania.
+// Package auth handles passwords, sessions, CSRF and login limits.
 package auth
 
 import (
@@ -13,10 +13,10 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-// MaxPasswordLen to limit długości hasła w bajtach.
+// MaxPasswordLen is the password length limit in bytes.
 const MaxPasswordLen = 256
 
-// Params to parametry Argon2id.
+// Params are the Argon2id parameters.
 type Params struct {
 	Memory  uint32 // KiB
 	Time    uint32
@@ -25,11 +25,11 @@ type Params struct {
 	KeyLen  uint32
 }
 
-// DefaultParams to minimum zalecane przez OWASP: m=19 MiB, t=2, p=1.
+// DefaultParams is the OWASP recommended minimum: m=19 MiB, t=2, p=1.
 var DefaultParams = Params{Memory: 19 * 1024, Time: 2, Threads: 1, SaltLen: 16, KeyLen: 32}
 
-// Granice akceptowanych parametrów chronią przed konfiguracją, która
-// zużyłaby całą pamięć serwera albo byłaby trywialna do złamania.
+// Bounds on accepted parameters protect against a configuration that
+// would use all of the server's memory or be trivial to crack.
 const (
 	minMemory = 8 * 1024  // 8 MiB
 	maxMemory = 50 * 1024 // 50 MiB
@@ -42,15 +42,15 @@ const (
 
 var b64 = base64.RawStdEncoding
 
-// Hash to sparsowany hash Argon2id w formacie PHC.
+// Hash is a parsed Argon2id hash in PHC format.
 type Hash struct {
 	Params Params
 	salt   []byte
 	key    []byte
 }
 
-// HashPassword tworzy hash w formacie
-// $argon2id$v=19$m=19456,t=2,p=1$<sól>$<klucz>.
+// HashPassword creates a hash in the format
+// $argon2id$v=19$m=19456,t=2,p=1$<salt>$<key>.
 func HashPassword(password []byte, p Params) (string, error) {
 	if len(password) == 0 {
 		return "", errors.New("hasło nie może być puste")
@@ -70,11 +70,11 @@ func HashPassword(password []byte, p Params) (string, error) {
 		argon2.Version, p.Memory, p.Time, p.Threads, b64.EncodeToString(salt), b64.EncodeToString(key)), nil
 }
 
-// ParseHash parsuje hash PHC i sprawdza parametry.
-// Komunikaty błędów nie zawierają fragmentów hasha.
+// ParseHash parses a PHC hash and checks its parameters.
+// Error messages contain no fragments of the hash.
 func ParseHash(s string) (*Hash, error) {
 	parts := strings.Split(s, "$")
-	// "", "argon2id", "v=19", "m=..,t=..,p=..", sól, klucz
+	// "", "argon2id", "v=19", "m=..,t=..,p=..", salt, key
 	if len(parts) != 6 || parts[0] != "" {
 		return nil, errors.New("oczekiwano formatu PHC $argon2id$v=19$m=..,t=..,p=..$sól$klucz")
 	}
@@ -131,7 +131,7 @@ func ParseHash(s string) (*Hash, error) {
 	return &Hash{Params: p, salt: salt, key: key}, nil
 }
 
-// Verify porównuje hasło z hashem w stałym czasie.
+// Verify compares a password with the hash in constant time.
 func (h *Hash) Verify(password []byte) bool {
 	if len(password) == 0 || len(password) > MaxPasswordLen {
 		return false

@@ -6,14 +6,14 @@ import (
 	"time"
 )
 
-// Wartości z wymagań dla sesji przed logowaniem.
+// Values from the requirements for pre-login sessions.
 const (
 	DefaultPreLoginTTL = 30 * time.Minute
 	DefaultPreLoginMax = 1000
 )
 
-// PreLogin trzyma w pamięci krótkie sesje przed logowaniem, które wiążą
-// token CSRF formularza logowania z ciasteczkiem przeglądarki.
+// PreLogin keeps short pre-login sessions in memory; they bind the
+// login form's CSRF token to the browser's cookie.
 type PreLogin struct {
 	ttl time.Duration
 	max int
@@ -28,7 +28,7 @@ type preEntry struct {
 	created time.Time
 }
 
-// NewPreLogin tworzy magazyn. Zerowe wartości dają domyślne.
+// NewPreLogin creates the store. Zero values give the defaults.
 func NewPreLogin(ttl time.Duration, max int, now func() time.Time) *PreLogin {
 	if ttl == 0 {
 		ttl = DefaultPreLoginTTL
@@ -42,11 +42,11 @@ func NewPreLogin(ttl time.Duration, max int, now func() time.Time) *PreLogin {
 	return &PreLogin{ttl: ttl, max: max, now: now, entries: map[string]preEntry{}}
 }
 
-// TTL zwraca czas życia sesji przed logowaniem.
+// TTL returns the lifetime of a pre-login session.
 func (p *PreLogin) TTL() time.Duration { return p.ttl }
 
-// Ensure zwraca token CSRF istniejącej sesji id albo tworzy nową sesję.
-// created mówi, czy trzeba ustawić nowe ciasteczko.
+// Ensure returns the CSRF token of the existing session id or creates a new session.
+// created says whether a new cookie must be set.
 func (p *PreLogin) Ensure(id string) (newID, csrf string, created bool, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -68,7 +68,7 @@ func (p *PreLogin) Ensure(id string) (newID, csrf string, created bool, err erro
 	return newID, csrf, true, nil
 }
 
-// Check sprawdza w stałym czasie, czy formularz pochodzi z sesji id.
+// Check verifies in constant time that the form comes from session id.
 func (p *PreLogin) Check(id, csrf string) bool {
 	if !validToken(id) || csrf == "" {
 		return false
@@ -82,22 +82,22 @@ func (p *PreLogin) Check(id, csrf string) bool {
 	return subtle.ConstantTimeCompare([]byte(e.csrf), []byte(csrf)) == 1
 }
 
-// Delete usuwa sesję po udanym logowaniu.
+// Delete removes the session after a successful login.
 func (p *PreLogin) Delete(id string) {
 	p.mu.Lock()
 	delete(p.entries, id)
 	p.mu.Unlock()
 }
 
-// Len zwraca liczbę przechowywanych sesji.
+// Len returns the number of stored sessions.
 func (p *PreLogin) Len() int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return len(p.entries)
 }
 
-// evictLocked robi miejsce na nowy wpis: usuwa wygasłe, a gdy to nie
-// wystarczy, najstarsze.
+// evictLocked makes room for a new entry: it removes expired ones and, when
+// that is not enough, the oldest ones.
 func (p *PreLogin) evictLocked(now time.Time) {
 	if len(p.entries) < p.max {
 		return

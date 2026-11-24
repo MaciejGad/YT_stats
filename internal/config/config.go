@@ -1,4 +1,4 @@
-// Package config wczytuje i waliduje konfigurację usługi.
+// Package config loads and validates the service configuration.
 package config
 
 import (
@@ -16,15 +16,15 @@ import (
 	"yt-stats/internal/auth"
 )
 
-// maxFileSize ogranicza rozmiar pliku konfiguracji.
+// maxFileSize limits the size of the configuration file.
 const maxFileSize = 64 << 10
 
-// MaxUsernameLen to limit długości nazwy użytkownika w bajtach.
+// MaxUsernameLen is the username length limit in bytes.
 const MaxUsernameLen = 64
 
 var channelIDPattern = regexp.MustCompile(`^UC[0-9A-Za-z_-]{22}$`)
 
-// Config to zawartość pliku konfiguracji.
+// Config is the contents of the configuration file.
 type Config struct {
 	Listen         string `json:"listen"`
 	ChannelID      string `json:"channel_id"`
@@ -36,8 +36,8 @@ type Config struct {
 	WebDir         string `json:"web_dir"`
 }
 
-// ValidationError zbiera wszystkie problemy z konfiguracją naraz.
-// Komunikaty zawierają nazwy pól, nigdy ich wartości.
+// ValidationError collects all configuration problems at once.
+// Messages contain field names, never their values.
 type ValidationError struct {
 	Problems []string
 }
@@ -46,7 +46,7 @@ func (e *ValidationError) Error() string {
 	return "niepoprawna konfiguracja:\n  - " + strings.Join(e.Problems, "\n  - ")
 }
 
-// Load wczytuje plik konfiguracji i go waliduje.
+// Load reads the configuration file and validates it.
 func Load(path string) (*Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -94,7 +94,7 @@ func Load(path string) (*Config, error) {
 	return cfg, nil
 }
 
-// Parse dekoduje JSON bez walidacji pól. Nieznane pola są błędem.
+// Parse decodes JSON without validating fields. Unknown fields are an error.
 func Parse(data []byte) (*Config, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
@@ -108,7 +108,7 @@ func Parse(data []byte) (*Config, error) {
 	return &cfg, nil
 }
 
-// sanitizeJSONError usuwa z błędów dekodera fragmenty wartości.
+// sanitizeJSONError removes value fragments from decoder errors.
 func sanitizeJSONError(err error) error {
 	var typeErr *json.UnmarshalTypeError
 	if errors.As(err, &typeErr) {
@@ -118,11 +118,11 @@ func sanitizeJSONError(err error) error {
 	if errors.As(err, &syntaxErr) {
 		return fmt.Errorf("błąd składni JSON w bajcie %d", syntaxErr.Offset)
 	}
-	// Pozostałe błędy (np. nieznane pole) zawierają tylko nazwę pola.
+	// Other errors (e.g. an unknown field) contain only the field name.
 	return err
 }
 
-// Validate sprawdza wszystkie pola i zwraca *ValidationError z listą problemów.
+// Validate checks all fields and returns a *ValidationError listing the problems.
 func (c *Config) Validate() error {
 	var p []string
 	add := func(format string, args ...any) { p = append(p, fmt.Sprintf(format, args...)) }
@@ -204,7 +204,7 @@ func validateListen(addr string) error {
 	return nil
 }
 
-// validKey dopuszcza znaki występujące w kluczach Google API.
+// validKey allows the characters found in Google API keys.
 func validKey(k string) bool {
 	if len(k) > 256 {
 		return false

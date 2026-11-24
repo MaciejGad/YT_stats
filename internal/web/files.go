@@ -1,4 +1,4 @@
-// Package web obsługuje pliki interfejsu i handlery HTTP.
+// Package web handles the interface files and the HTTP handlers.
 package web
 
 import (
@@ -16,16 +16,16 @@ import (
 	"time"
 )
 
-// Pliki wymagane w katalogu web_dir.
+// Files required in the web_dir directory.
 var (
 	TemplateNames = []string{"index.html", "login.html"}
 	StaticNames   = []string{"script.js", "style.css", "logo.png", "favicon.png"}
 )
 
-// maxFileSize ogranicza rozmiar pojedynczego pliku interfejsu.
+// maxFileSize limits the size of a single interface file.
 const maxFileSize = 1 << 20
 
-// fileStamp identyfikuje wersję pliku na dysku.
+// fileStamp identifies the version of a file on disk.
 type fileStamp struct {
 	modTime time.Time
 	size    int64
@@ -36,7 +36,7 @@ type templateEntry struct {
 	tmpl  *template.Template
 }
 
-// StaticFile to wczytana zawartość pliku statycznego.
+// StaticFile is the loaded content of a static file.
 type StaticFile struct {
 	Name    string
 	Content []byte
@@ -45,9 +45,9 @@ type StaticFile struct {
 	stamp   fileStamp
 }
 
-// Files trzyma szablony i pliki statyczne z web_dir. Przy każdym
-// odczycie porównuje czas modyfikacji i rozmiar pliku i wczytuje go
-// ponownie po zmianie. Błędna nowa wersja nie zastępuje poprzedniej.
+// Files holds the templates and static files from web_dir. On every
+// read it compares the file's modification time and size and reloads it
+// after a change. An invalid new version does not replace the previous one.
 type Files struct {
 	dir string
 	log *slog.Logger
@@ -57,8 +57,8 @@ type Files struct {
 	static    map[string]*StaticFile
 }
 
-// LoadFiles wczytuje wszystkie wymagane pliki. Brak lub błąd któregokolwiek
-// przerywa start z komunikatem wskazującym plik.
+// LoadFiles loads all required files. A missing or invalid file
+// stops startup with a message naming the file.
 func LoadFiles(dir string, log *slog.Logger) (*Files, error) {
 	info, err := os.Stat(dir)
 	if err != nil {
@@ -97,7 +97,7 @@ func LoadFiles(dir string, log *slog.Logger) (*Files, error) {
 	return f, nil
 }
 
-// Template zwraca aktualny szablon o podanej nazwie.
+// Template returns the current template with the given name.
 func (f *Files) Template(name string) (*template.Template, error) {
 	f.mu.RLock()
 	e, ok := f.templates[name]
@@ -117,13 +117,13 @@ func (f *Files) Template(name string) (*template.Template, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if cur := f.templates[name]; cur.stamp != e.stamp {
-		// Inne żądanie już przeładowało plik.
+		// Another request has already reloaded the file.
 		return cur.tmpl, nil
 	}
 	ne, err := f.loadTemplate(name)
 	if err != nil {
 		f.log.Error("błąd w nowej wersji szablonu, używam poprzedniej", "file", name, "err", err)
-		// Zapamiętaj wersję, żeby nie parsować błędnego pliku przy każdym żądaniu.
+		// Remember the version so an invalid file is not parsed on every request.
 		f.templates[name] = &templateEntry{stamp: stamp, tmpl: e.tmpl}
 		return e.tmpl, nil
 	}
@@ -132,7 +132,7 @@ func (f *Files) Template(name string) (*template.Template, error) {
 	return ne.tmpl, nil
 }
 
-// Static zwraca aktualną zawartość pliku statycznego.
+// Static returns the current content of a static file.
 func (f *Files) Static(name string) (*StaticFile, error) {
 	f.mu.RLock()
 	s, ok := f.static[name]
@@ -229,10 +229,10 @@ func (f *Files) loadStatic(name string) (*StaticFile, error) {
 	}, nil
 }
 
-// AssetURL zwraca adres pliku statycznego z wersją, np. /yt/script.js?v=1a2b…
-// Wersja to skrót zawartości, więc każda zmiana pliku daje nowy adres
-// i ani przeglądarka, ani Cloudflare nie podadzą starej kopii.
-// W szablonach: {{asset "script.js"}}.
+// AssetURL returns the versioned URL of a static file, e.g. /yt/script.js?v=1a2b…
+// The version is a content hash, so every change to the file gives a new URL
+// and neither the browser nor Cloudflare serves a stale copy.
+// In templates: {{asset "script.js"}}.
 func (f *Files) AssetURL(name string) (string, error) {
 	s, err := f.Static(name)
 	if err != nil {
@@ -241,7 +241,7 @@ func (f *Files) AssetURL(name string) (string, error) {
 	return "/yt/" + name + "?v=" + s.Version(), nil
 }
 
-// Version zwraca wersję pliku (ETag bez cudzysłowów).
+// Version returns the file version (the ETag without quotes).
 func (s *StaticFile) Version() string {
 	return strings.Trim(s.ETag, `"`)
 }

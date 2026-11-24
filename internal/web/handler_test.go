@@ -35,7 +35,7 @@ type app struct {
 	t        *testing.T
 	handler  http.Handler
 	clock    *testClock
-	dir      string // katalog pliku sesji
+	dir      string // session file directory
 	sessions *auth.Store
 	logs     *syncBuffer
 	deps     Deps
@@ -83,7 +83,7 @@ func newApp(t *testing.T, params auth.Params, ao auth.AuthOptions) *app {
 	return &app{t: t, handler: NewHandler(d), clock: clk, dir: dir, sessions: store, logs: logs, deps: d, stats: fs}
 }
 
-// restart symuluje restart procesu: nowy magazyn z tego samego pliku.
+// restart simulates a process restart: a new store from the same file.
 func (a *app) restart() {
 	a.t.Helper()
 	a.sessions.Close()
@@ -98,7 +98,7 @@ func (a *app) restart() {
 	a.handler = NewHandler(a.deps)
 }
 
-// browser przechowuje ciasteczka jak przeglądarka (z uwzględnieniem usuwania).
+// browser stores cookies like a browser does (including deletion).
 type browser struct {
 	app     *app
 	cookies map[string]*http.Cookie
@@ -150,7 +150,7 @@ func csrfFrom(t *testing.T, rec *httptest.ResponseRecorder) string {
 	return m[1]
 }
 
-// login otwiera formularz i wysyła dane.
+// login opens the form and submits the data.
 func (b *browser) login(user, pass string, remember bool) *httptest.ResponseRecorder {
 	b.app.t.Helper()
 	form := url.Values{"csrf": {csrfFrom(b.app.t, b.do("GET", "/yt/login", nil))}, "username": {user}, "password": {pass}}
@@ -186,7 +186,7 @@ func checkCookieAttrs(t *testing.T, c *http.Cookie) {
 	}
 }
 
-// --- dostęp bez sesji ---
+// --- access without a session ---
 
 func TestPanelWithoutSessionRedirects(t *testing.T) {
 	a := newApp(t, fastParams, auth.AuthOptions{})
@@ -237,7 +237,7 @@ func TestLoginFormReusesPreSession(t *testing.T) {
 	}
 }
 
-// --- logowanie ---
+// --- login ---
 
 func TestLoginBrowserSession(t *testing.T) {
 	a := newApp(t, fastParams, auth.AuthOptions{})
@@ -388,7 +388,7 @@ func TestLoginCSRFRejected(t *testing.T) {
 			if _, ok := setCookieOpt(rec, SessionCookie); ok {
 				t.Error("ustawiono ciasteczko sesji")
 			}
-			// Odpowiedź daje nowy, działający formularz.
+			// The response gives a new, working form.
 			form := url.Values{"csrf": {csrfFrom(t, rec)}, "username": {testUser}, "password": {testPass}}
 			expectRedirect(t, b.do("POST", "/yt/login", form), "/yt/")
 		})
@@ -404,7 +404,7 @@ func TestCSRFFailureDoesNotCountAsAttempt(t *testing.T) {
 	expectRedirect(t, b.login(testUser, testPass, false), "/yt/")
 }
 
-// --- limity ---
+// --- limits ---
 
 func TestLoginRateLimit(t *testing.T) {
 	a := newApp(t, fastParams, auth.AuthOptions{})
@@ -414,7 +414,7 @@ func TestLoginRateLimit(t *testing.T) {
 			t.Fatalf("próba %d: %d", i+1, rec.Code)
 		}
 	}
-	rec := b.login(testUser, testPass, false) // nawet poprawne hasło
+	rec := b.login(testUser, testPass, false) // even the correct password
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("6. próba: %d, oczekiwano 429", rec.Code)
 	}
@@ -425,7 +425,7 @@ func TestLoginRateLimit(t *testing.T) {
 		t.Errorf("komunikat bez czasu oczekiwania:\n%s", rec.Body.String())
 	}
 
-	// Inny adres może się logować.
+	// Another address can log in.
 	other := a.browser()
 	other.remote = "198.51.100.1:1234"
 	expectRedirect(t, other.login(testUser, testPass, false), "/yt/")
@@ -437,7 +437,7 @@ func TestLoginRateLimit(t *testing.T) {
 func TestXRealIPTrustedOnlyFromLoopback(t *testing.T) {
 	a := newApp(t, fastParams, auth.AuthOptions{})
 
-	// Za Nginx: połączenie z loopbacka, adres klienta w X-Real-IP.
+	// Behind Nginx: a loopback connection, the client address in X-Real-IP.
 	attacker := a.browser()
 	attacker.remote = "127.0.0.1:40000"
 	attacker.headers["X-Real-IP"] = "203.0.113.50"
@@ -453,7 +453,7 @@ func TestXRealIPTrustedOnlyFromLoopback(t *testing.T) {
 	owner.headers["X-Real-IP"] = "198.51.100.9"
 	expectRedirect(t, owner.login(testUser, testPass, false), "/yt/")
 
-	// Połączenie spoza loopbacka nie może podać innego adresu.
+	// A non-loopback connection cannot claim another address.
 	spoof := a.browser()
 	spoof.remote = "203.0.113.50:5555"
 	spoof.headers["X-Real-IP"] = "198.51.100.200"
@@ -511,7 +511,7 @@ func TestLongCredentialsRejected(t *testing.T) {
 }
 
 func TestLoginBusy(t *testing.T) {
-	// Wolny hash (ok. 0,5–1 s) i jedno miejsce na weryfikację.
+	// A slow hash (about 0.5–1 s) and a single verification slot.
 	slow := auth.Params{Memory: 32 * 1024, Time: 8, Threads: 1, SaltLen: 16, KeyLen: 32}
 	a := newApp(t, slow, auth.AuthOptions{MaxConcurrent: 1, WaitTimeout: 10 * time.Millisecond})
 
@@ -553,7 +553,7 @@ func TestLoginCancelledRequest(t *testing.T) {
 	}
 }
 
-// --- błędy pliku sesji ---
+// --- session file errors ---
 
 func TestLoginStoreWriteFailure(t *testing.T) {
 	if os.Geteuid() == 0 {
@@ -575,7 +575,7 @@ func TestLoginStoreWriteFailure(t *testing.T) {
 	expectRedirect(t, b.do("POST", "/yt/login", form), "/yt/")
 }
 
-// --- wylogowanie ---
+// --- logout ---
 
 func logoutForm(t *testing.T, b *browser) url.Values {
 	t.Helper()
@@ -598,7 +598,7 @@ func TestLogout(t *testing.T) {
 		t.Error("sesja nadal ważna po wylogowaniu")
 	}
 
-	// Stare ciasteczko (np. z kopii) już nie działa.
+	// An old cookie (e.g. from a copy) no longer works.
 	b.cookies[SessionCookie] = &http.Cookie{Name: SessionCookie, Value: token}
 	expectRedirect(t, b.do("GET", "/yt/", nil), "/yt/login")
 }
@@ -657,7 +657,7 @@ func TestLogoutWriteFailureAllowsRetry(t *testing.T) {
 	expectRedirect(t, b.do("POST", "/yt/logout", url.Values{"csrf": {csrfFrom(t, rec)}}), "/yt/login")
 }
 
-// --- trasy ---
+// --- routes ---
 
 func TestRoutes(t *testing.T) {
 	a := newApp(t, fastParams, auth.AuthOptions{})
@@ -678,13 +678,13 @@ func TestRoutes(t *testing.T) {
 			t.Errorf("GET %s: %d, oczekiwano 404", p, rec.Code)
 		}
 	}
-	// /yt bez ukośnika kieruje na /yt/ (Nginx robi to samo przed proxy).
+	// /yt without a slash redirects to /yt/ (Nginx does the same before the proxy).
 	if rec := b.do("GET", "/yt", nil); rec.Header().Get("Location") != "/yt/" {
 		t.Errorf("GET /yt: %d → %q", rec.Code, rec.Header().Get("Location"))
 	}
 }
 
-// --- logi ---
+// --- logs ---
 
 func TestLogsContainNoSecrets(t *testing.T) {
 	a := newApp(t, fastParams, auth.AuthOptions{})

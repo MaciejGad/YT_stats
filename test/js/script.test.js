@@ -1,10 +1,10 @@
-// Testy funkcji bez DOM z web/script.js. Uruchomienie: node --test test/js
+// Tests of the DOM-free functions from web/script.js. Run with: node --test test/js/*.test.js
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { formatCount, formatTime, sortVideos, videoURL, shareOf } = require('../../web/script.js');
 
-// Intl w pl-PL używa niełamliwej spacji jako separatora tysięcy.
+// Intl in pl-PL uses a no-break space as the thousands separator.
 const nb = (s) => s.replace(/[  ]/g, ' ');
 
 test('formatCount formatuje według pl-PL', () => {
@@ -21,13 +21,13 @@ test('formatCount zwraca null dla braku licznika', () => {
 });
 
 test('formatTime pokazuje czas w Europe/Warsaw niezależnie od strefy', () => {
-  // 23:15:30 UTC zimą to 00:15:30 następnego dnia w Polsce.
+  // 23:15:30 UTC in winter is 00:15:30 the next day in Poland.
   const winter = nb(formatTime('2026-11-23T23:15:30Z'));
   assert.match(winter, /24 listopada 2026/);
   assert.match(winter, /00:15:30/);
-  // Latem +02:00.
+  // +02:00 in summer.
   assert.match(nb(formatTime('2026-07-01T10:00:00Z')), /12:00:00/);
-  // Czas z przesunięciem z serwera.
+  // A time with the offset from the server.
   assert.match(nb(formatTime('2026-11-24T00:15:30+01:00')), /00:15:30/);
 });
 
@@ -70,7 +70,7 @@ test('videoURL koduje identyfikator', () => {
 test('shareOf liczy udział względem najpopularniejszego filmu', () => {
   assert.equal(shareOf('5000', 5000), 100);
   assert.equal(shareOf('2500', 5000), 50);
-  assert.equal(shareOf('1', 5000), 1); // widoczny pasek nawet dla małych wartości
+  assert.equal(shareOf('1', 5000), 1); // the bar is visible even for small values
   assert.equal(shareOf('0', 5000), 0);
   assert.equal(shareOf(null, 5000), 0);
   assert.equal(shareOf('10', 0), 0);

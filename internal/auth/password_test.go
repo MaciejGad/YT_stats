@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// fastParams przyspieszają testy; produkcja używa DefaultParams.
+// fastParams speed up tests; production uses DefaultParams.
 var fastParams = Params{Memory: 8 * 1024, Time: 1, Threads: 1, SaltLen: 16, KeyLen: 32}
 
 func TestHashAndVerify(t *testing.T) {

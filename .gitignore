@@ -1,12 +1,12 @@
-# Stara implementacja PHP — tylko podgląd, zawiera sekrety
+# Old PHP implementation — reference only, contains secrets
 old_implementation/
 
-# Binarka i lokalna konfiguracja
+# Binary and local configuration
 /yt-stats
 /config.json
 /data/
 
 .DS_Store
 
-# Paczki wdrożeniowe
+# Deployment packages
 /dist/

@@ -45,7 +45,7 @@ func openTestStore(t *testing.T, path string, clk *testClock) *Store {
 
 func storePath(t *testing.T) string { return filepath.Join(t.TempDir(), "sessions.json") }
 
-// --- czasy życia ---
+// --- lifetimes ---
 
 func TestBrowserSessionLifetime(t *testing.T) {
 	clk := newTestClock()
@@ -77,7 +77,7 @@ func TestPersistentSessionLifetimeNoSliding(t *testing.T) {
 	if !sess.Persistent || sess.Expires.Sub(sess.Created) != 90*24*time.Hour {
 		t.Errorf("sesja: %+v", sess)
 	}
-	// Codzienne korzystanie nie przesuwa terminu.
+	// Daily use does not move the expiry.
 	for range 89 {
 		clk.Add(24 * time.Hour)
 		got, ok := s.Lookup(token)
@@ -88,7 +88,7 @@ func TestPersistentSessionLifetimeNoSliding(t *testing.T) {
 			t.Fatalf("termin przesunął się: %v → %v", sess.Expires, got.Expires)
 		}
 	}
-	clk.Add(23 * time.Hour) // 89 dni 23 h
+	clk.Add(23 * time.Hour) // 89 days 23 h
 	if _, ok := s.Lookup(token); !ok {
 		t.Error("sesja powinna być ważna po 89 dniach 23 h")
 	}
@@ -98,7 +98,7 @@ func TestPersistentSessionLifetimeNoSliding(t *testing.T) {
 	}
 }
 
-// --- format i plik ---
+// --- format and file ---
 
 func TestTokenFormatAndHashOnlyInFile(t *testing.T) {
 	path := storePath(t)
@@ -251,7 +251,7 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-// --- błędy pliku ---
+// --- file errors ---
 
 func TestCorruptFileMovedAside(t *testing.T) {
 	for name, content := range map[string]string{
@@ -283,7 +283,7 @@ func TestCorruptFileMovedAside(t *testing.T) {
 			if !strings.Contains(logs.String(), "uszkodzony") {
 				t.Errorf("brak wpisu w logu: %s", logs.String())
 			}
-			// Magazyn działa dalej.
+			// The store keeps working.
 			if _, _, err := s.Create(false); err != nil {
 				t.Errorf("Create po odzyskaniu: %v", err)
 			}
@@ -339,7 +339,7 @@ func TestDeleteFailsKeepsSession(t *testing.T) {
 	}
 	os.Chmod(dir, 0o700)
 
-	// Ponowienie działa.
+	// Retrying works.
 	if err := s.Delete(token); err != nil {
 		t.Fatal(err)
 	}
@@ -373,7 +373,7 @@ func TestFileIsValidJSON(t *testing.T) {
 	}
 }
 
-// --- blokada ---
+// --- lock ---
 
 func TestSecondStoreLocked(t *testing.T) {
 	path := storePath(t)
@@ -455,7 +455,7 @@ func TestConcurrentCreateLookup(t *testing.T) {
 	}
 }
 
-// --- token wylogowania ---
+// --- logout token ---
 
 func TestLogoutToken(t *testing.T) {
 	a, _ := newToken()

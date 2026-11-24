@@ -5,28 +5,28 @@ import (
 	"time"
 )
 
-// LimiterOptions to limity nieudanych logowań. Zerowe pola dostają wartości
-// z wymagań.
+// LimiterOptions holds the failed login limits. Zero fields get the values
+// from the requirements.
 type LimiterOptions struct {
 	PerIP        int           // 5
 	PerIPWindow  time.Duration // 15 min
 	Global       int           // 50
 	GlobalWindow time.Duration // 1 h
-	MaxIPs       int           // 10 000
+	MaxIPs       int           // 10,000
 	Now          func() time.Time
 }
 
-// Limiter liczy nieudane logowania w przesuwanych oknach czasu: osobno dla
-// każdego adresu IP i łącznie dla wszystkich.
+// Limiter counts failed logins in sliding time windows: separately for
+// each IP address and in total for all of them.
 type Limiter struct {
 	o LimiterOptions
 
 	mu     sync.Mutex
-	perIP  map[string][]time.Time // czasy ostatnich porażek, najstarsza pierwsza
+	perIP  map[string][]time.Time // times of recent failures, oldest first
 	global []time.Time
 }
 
-// NewLimiter tworzy limiter.
+// NewLimiter creates a limiter.
 func NewLimiter(o LimiterOptions) *Limiter {
 	if o.PerIP == 0 {
 		o.PerIP = 5
@@ -49,8 +49,8 @@ func NewLimiter(o LimiterOptions) *Limiter {
 	return &Limiter{o: o, perIP: map[string][]time.Time{}}
 }
 
-// Allow mówi, czy z adresu ip można teraz spróbować się zalogować.
-// Przy odmowie zwraca czas do odblokowania.
+// Allow says whether a login attempt from ip is allowed now.
+// When refused, it returns the time until unblocking.
 func (l *Limiter) Allow(ip string) (bool, time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -73,7 +73,7 @@ func (l *Limiter) Allow(ip string) (bool, time.Duration) {
 	return wait <= 0, wait
 }
 
-// Failure zapisuje nieudane logowanie z adresu ip.
+// Failure records a failed login from ip.
 func (l *Limiter) Failure(ip string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -94,22 +94,22 @@ func (l *Limiter) Failure(ip string) {
 	}
 }
 
-// Success zeruje licznik adresu ip po udanym logowaniu.
+// Success resets the counter for ip after a successful login.
 func (l *Limiter) Success(ip string) {
 	l.mu.Lock()
 	delete(l.perIP, ip)
 	l.mu.Unlock()
 }
 
-// TrackedIPs zwraca liczbę pamiętanych adresów.
+// TrackedIPs returns the number of remembered addresses.
 func (l *Limiter) TrackedIPs() int {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return len(l.perIP)
 }
 
-// evictLocked usuwa adresy bez porażek w oknie, a gdy to nie wystarczy,
-// adres z najdawniejszą ostatnią porażką.
+// evictLocked removes addresses with no failures in the window and, when that
+// is not enough, the address whose last failure is the oldest.
 func (l *Limiter) evictLocked(now time.Time) {
 	for ip, f := range l.perIP {
 		if len(prune(f, now, l.o.PerIPWindow)) == 0 {
@@ -129,7 +129,7 @@ func (l *Limiter) evictLocked(now time.Time) {
 	}
 }
 
-// prune usuwa czasy starsze niż okno. Zwraca podwycinek tej samej tablicy.
+// prune removes times older than the window. It returns a subslice of the same array.
 func prune(ts []time.Time, now time.Time, window time.Duration) []time.Time {
 	i := 0
 	for i < len(ts) && now.Sub(ts[i]) >= window {

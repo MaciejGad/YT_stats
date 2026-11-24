@@ -1,11 +1,11 @@
 //go:build integration
 
-// Test z prawdziwym YouTube Data API. Uruchamiany ręcznie:
+// Test against the real YouTube Data API. Run by hand:
 //
 //	YT_API_KEY=... go test -tags integration -v -run Integration ./internal/youtube
 //
-// Opcjonalnie YT_CHANNEL_ID (domyślnie kanał @YarnPowerPL).
-// Zużywa kilka jednostek dziennego limitu klucza.
+// Optionally YT_CHANNEL_ID (defaults to the @YarnPowerPL channel).
+// Uses a few units of the key's daily quota.
 package youtube
 
 import (

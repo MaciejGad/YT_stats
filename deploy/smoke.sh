@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sprawdza wdrożony panel z zewnątrz (z Maca), bez logowania.
+# Checks the deployed panel from outside (from the Mac), without logging in.
 #
 #   deploy/smoke.sh [https://maciejgad.pl]
 set -uo pipefail
@@ -9,19 +9,19 @@ UA="Mozilla/5.0 (Macintosh) yt-stats-smoke"
 pass=0
 fail=0
 
-# fetch_headers URL → nagłówki odpowiedzi (bez podążania za przekierowaniami)
+# fetch_headers URL → response headers (without following redirects)
 fetch_headers() { curl -s -o /dev/null -D - --max-time 15 -A "$UA" "$1" | tr -d '\r'; }
 status() { fetch_headers "$1" | awk 'NR==1 {print $2}'; }
 header() { fetch_headers "$1" | awk -v h="$(echo "$2" | tr 'A-Z' 'a-z')" -F': ' 'tolower($1)==h {print $2; exit}'; }
 
-check() { # opis, oczekiwane, faktyczne
+check() { # description, expected, actual
   if [ "$2" = "$3" ]; then
     printf '  ok    %-52s %s\n' "$1" "$3"; pass=$((pass + 1))
   else
     printf '  BŁĄD  %-52s jest %q, oczekiwano %q\n' "$1" "$3" "$2"; fail=$((fail + 1))
   fi
 }
-contains() { # opis, fragment, tekst
+contains() { # description, fragment, text
   case "$3" in
     *"$2"*) printf '  ok    %-52s\n' "$1"; pass=$((pass + 1)) ;;
     *) printf '  BŁĄD  %-52s brak %s\n' "$1" "$2"; fail=$((fail + 1)) ;;

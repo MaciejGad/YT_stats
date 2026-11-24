@@ -17,7 +17,7 @@ import (
 	"yt-stats/internal/stats"
 )
 
-// Nazwy i parametry ciasteczek.
+// Cookie names and parameters.
 const (
 	SessionCookie  = "yt_session"
 	PreLoginCookie = "yt_login"
@@ -25,14 +25,14 @@ const (
 	maxFormBytes   = 4 << 10
 )
 
-// Ścieżki aplikacji.
+// Application paths.
 const (
 	pathPanel  = "/yt/"
 	pathLogin  = "/yt/login"
 	pathLogout = "/yt/logout"
 )
 
-// Deps to zależności handlera.
+// Deps are the handler's dependencies.
 type Deps struct {
 	Files    *Files
 	Log      *slog.Logger
@@ -43,7 +43,7 @@ type Deps struct {
 	Stats    StatsSource
 }
 
-// StatsSource dostarcza dane do /yt/stat.json. Implementuje go *stats.Cache.
+// StatsSource provides the data for /yt/stat.json. *stats.Cache implements it.
 type StatsSource interface {
 	Get(ctx context.Context) (*stats.Payload, error)
 }
@@ -52,11 +52,11 @@ type server struct {
 	Deps
 }
 
-// NewHandler zwraca główny handler HTTP.
+// NewHandler returns the main HTTP handler.
 func NewHandler(d Deps) http.Handler {
 	s := &server{Deps: d}
 	mux := http.NewServeMux()
-	// Wzorce GET obsługują też HEAD; inna metoda daje 405 z nagłówkiem Allow.
+	// GET patterns also handle HEAD; any other method gives 405 with an Allow header.
 	mux.HandleFunc("GET /yt/{$}", s.handlePanel)
 	mux.HandleFunc("GET /yt/login", s.handleLoginForm)
 	mux.HandleFunc("POST /yt/login", s.handleLogin)
@@ -68,7 +68,7 @@ func NewHandler(d Deps) http.Handler {
 	return securityHeaders(mux)
 }
 
-// --- dane szablonów ---
+// --- template data ---
 
 type loginData struct {
 	CSRF  string
@@ -91,7 +91,7 @@ func (s *server) handlePanel(w http.ResponseWriter, r *http.Request) {
 	s.render(w, http.StatusOK, "index.html", panelData{LogoutCSRF: auth.LogoutToken(token)})
 }
 
-// --- logowanie ---
+// --- login ---
 
 func (s *server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.session(w, r); ok {
@@ -131,7 +131,7 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.renderLogin(w, r, http.StatusServiceUnavailable, "Serwer jest chwilowo zajęty. Spróbuj ponownie za chwilę.")
 		return
 	case err != nil:
-		return // klient przerwał żądanie
+		return // the client aborted the request
 	case !ok:
 		s.Limiter.Failure(ip)
 		s.Log.Warn("nieudane logowanie", "ip", ip)
@@ -154,7 +154,7 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, pathPanel, http.StatusSeeOther)
 }
 
-// --- wylogowanie ---
+// --- logout ---
 
 func (s *server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if !s.parseForm(w, r) {
@@ -186,10 +186,10 @@ func (s *server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, pathLogin, http.StatusSeeOther)
 }
 
-// --- pomocnicze ---
+// --- helpers ---
 
-// session zwraca identyfikator ważnej sesji z ciasteczka. Nieważne
-// ciasteczko jest usuwane z przeglądarki.
+// session returns the identifier of a valid session from the cookie. An invalid
+// cookie is deleted from the browser.
 func (s *server) session(w http.ResponseWriter, r *http.Request) (string, bool) {
 	token := cookieValue(r, SessionCookie)
 	if token == "" {
@@ -202,7 +202,7 @@ func (s *server) session(w http.ResponseWriter, r *http.Request) (string, bool) 
 	return token, true
 }
 
-// parseForm ogranicza rozmiar formularza do 4 KiB.
+// parseForm limits the form size to 4 KiB.
 func (s *server) parseForm(w http.ResponseWriter, r *http.Request) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
 	if err := r.ParseForm(); err != nil {
@@ -238,7 +238,7 @@ func (s *server) renderLogin(w http.ResponseWriter, r *http.Request, status int,
 	s.render(w, status, "login.html", loginData{CSRF: csrf, Error: msg})
 }
 
-// render wykonuje szablon do bufora, żeby błąd szablonu dał czyste 500.
+// render executes the template into a buffer, so a template error gives a clean 500.
 func (s *server) render(w http.ResponseWriter, status int, name string, data any) {
 	tmpl, err := s.Files.Template(name)
 	if err != nil {
@@ -269,7 +269,7 @@ func setSessionCookie(w http.ResponseWriter, token string, sess auth.Session) {
 		SameSite: http.SameSiteLaxMode,
 	}
 	if sess.Persistent {
-		// Ten sam termin co sesja na serwerze, liczony od logowania.
+		// The same expiry as the server-side session, counted from login.
 		c.Expires = sess.Expires.UTC()
 		c.MaxAge = int(sess.Expires.Sub(sess.Created).Seconds())
 	}
@@ -296,8 +296,8 @@ func cookieValue(r *http.Request, name string) string {
 	return c.Value
 }
 
-// clientIP zwraca adres klienta. X-Real-IP (ustawiany przez Nginx) jest
-// brany pod uwagę tylko dla połączeń z loopbacka.
+// clientIP returns the client address. X-Real-IP (set by Nginx) is
+// taken into account only for loopback connections.
 func clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -311,7 +311,7 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-// humanMinutes zaokrągla czas oczekiwania w górę do pełnych minut.
+// humanMinutes rounds the waiting time up to whole minutes.
 func humanMinutes(d time.Duration) string {
 	m := int(math.Ceil(d.Minutes()))
 	switch {

@@ -1,5 +1,5 @@
-# Usługa panelu statystyk YarnPower.
-# Instalacja: deploy/install.sh (kopiuje plik do /etc/systemd/system/).
+# YarnPower statistics panel service.
+# Installation: deploy/install.sh (copies the file to /etc/systemd/system/).
 [Unit]
 Description=YarnPower - panel statystyk YouTube
 Documentation=file:///opt/yt-stats/README.md
@@ -15,17 +15,17 @@ Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=15s
 
-# Katalog stanu /var/lib/yt-stats (plik sesji) zakłada i posiada systemd.
+# The state directory /var/lib/yt-stats (session file) is created and owned by systemd.
 StateDirectory=yt-stats
 StateDirectoryMode=0700
 UMask=0077
 
-# Pamięć: twardy limit i miękki limit dla odśmiecacza Go.
+# Memory: a hard limit and a soft limit for the Go garbage collector.
 MemoryMax=128M
 Environment=GOMEMLIMIT=96MiB
 
-# Utwardzenie. Jeśli usługa w kontenerze nie startuje ze statusem
-# 226/NAMESPACE, zobacz sekcję „Rozwiązywanie problemów” w deploy/README.md.
+# Hardening. If the service fails to start in a container with status
+# 226/NAMESPACE, see the "Troubleshooting" section in deploy/README.md.
 NoNewPrivileges=yes
 CapabilityBoundingSet=
 AmbientCapabilities=

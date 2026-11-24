@@ -19,7 +19,7 @@ import (
 	"yt-stats/internal/auth"
 )
 
-// syncBuffer to bufor bezpieczny przy równoległych zapisach (logi serwera).
+// syncBuffer is a buffer safe for concurrent writes (server logs).
 type syncBuffer struct {
 	mu sync.Mutex
 	b  bytes.Buffer
@@ -37,8 +37,8 @@ func (s *syncBuffer) String() string {
 	return s.b.String()
 }
 
-// testEnv zwraca środowisko z buforami i nasłuchem, który zawsze
-// odrzuca próbę otwarcia gniazda.
+// testEnv returns an environment with buffers and a listener that always
+// refuses to open a socket.
 func testEnv(stdin string) (env, *syncBuffer, *syncBuffer) {
 	var out, errOut syncBuffer
 	return env{
@@ -51,8 +51,8 @@ func testEnv(stdin string) (env, *syncBuffer, *syncBuffer) {
 	}, &out, &errOut
 }
 
-// localListen otwiera gniazdo na losowym wolnym porcie zamiast adresu
-// z konfiguracji i przekazuje je testowi przez kanał.
+// localListen opens a socket on a random free port instead of the address
+// from the configuration and passes it to the test through a channel.
 func localListen(t *testing.T, got chan<- net.Listener) func(string, string) (net.Listener, error) {
 	return func(network, _ string) (net.Listener, error) {
 		ln, err := net.Listen(network, "127.0.0.1:0")
@@ -64,7 +64,7 @@ func localListen(t *testing.T, got chan<- net.Listener) func(string, string) (ne
 	}
 }
 
-// writeValidConfig tworzy poprawną konfigurację w katalogu tymczasowym.
+// writeValidConfig creates a valid configuration in a temporary directory.
 func writeValidConfig(t *testing.T, webDir string) string {
 	t.Helper()
 	hash, err := auth.HashPassword([]byte("sekret"), auth.Params{Memory: 8 * 1024, Time: 1, Threads: 1, SaltLen: 16, KeyLen: 32})
@@ -93,7 +93,7 @@ func newTestLogger(w io.Writer) *slog.Logger { return slog.New(slog.NewTextHandl
 
 // --- hash-password ---
 
-// fakeReader zwraca kolejne hasła z listy.
+// fakeReader returns passwords from a list in order.
 func fakeReader(answers ...string) secretReader {
 	return func(string) ([]byte, error) {
 		if len(answers) == 0 {
@@ -185,7 +185,7 @@ func TestHashPasswordRejectsArgs(t *testing.T) {
 	}
 }
 
-// --- pozostałe polecenia ---
+// --- other commands ---
 
 func TestVersion(t *testing.T) {
 	e, out, _ := testEnv("")
@@ -226,7 +226,7 @@ func TestUnknownFlag(t *testing.T) {
 	}
 }
 
-// --- serwer: błędy startu ---
+// --- server: startup errors ---
 
 func TestServeExampleConfigFails(t *testing.T) {
 	data, err := os.ReadFile("../../config.example.json")
@@ -278,7 +278,7 @@ func TestServeListenError(t *testing.T) {
 	}
 }
 
-// --- serwer: pełny cykl ---
+// --- server: full lifecycle ---
 
 func TestServeStartsAndStops(t *testing.T) {
 	path := writeValidConfig(t, "../../web")
@@ -330,7 +330,7 @@ func TestServeStartsAndStops(t *testing.T) {
 		t.Errorf("logi zawierają sekret:\n%s", logs)
 	}
 
-	// Gniazdo jest zamknięte — nowe połączenie się nie uda.
+	// The socket is closed — a new connection fails.
 	if c, err := net.DialTimeout("tcp", ln.Addr().String(), time.Second); err == nil {
 		c.Close()
 		t.Error("gniazdo przyjmuje połączenia po zatrzymaniu")
@@ -430,7 +430,7 @@ func TestServeListenerFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ln.Close() // Serve od razu dostanie błąd Accept.
+	ln.Close() // Serve gets an Accept error straight away.
 
 	var logs syncBuffer
 	err = serve(context.Background(), ln, http.NotFoundHandler(), newTestLogger(&logs))
@@ -555,7 +555,7 @@ func TestSecondInstanceRefusesSessionFile(t *testing.T) {
 
 func TestCheckConfigOK(t *testing.T) {
 	path := writeValidConfig(t, "../../web")
-	// Działa także przy zablokowanym pliku sesji (pracująca usługa).
+	// Works even when the session file is locked (running service).
 	store, err := auth.OpenStore(sessionFileOf(t, path), auth.StoreOptions{})
 	if err != nil {
 		t.Fatal(err)

@@ -1,5 +1,5 @@
-// Package stats trzyma ostatni wynik pobrania statystyk w pamięci,
-// łączy równoległe odświeżenia i zwraca dane awaryjne po błędzie.
+// Package stats keeps the last statistics result in memory,
+// merges concurrent refreshes and returns stale data after an error.
 package stats
 
 import (
@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
-	_ "time/tzdata" // Europe/Warsaw niezależnie od systemu
+	_ "time/tzdata" // Europe/Warsaw independent of the system
 
 	"yt-stats/internal/youtube"
 )
 
-// Domyślne czasy z wymagań.
+// Default durations from the requirements.
 const (
 	DefaultTTL            = 60 * time.Second
 	DefaultMaxStaleAge    = 24 * time.Hour
@@ -22,7 +22,7 @@ const (
 	DefaultRefreshTimeout = 30 * time.Second
 )
 
-// ErrUnavailable oznacza brak świeżego i awaryjnego wyniku (HTTP 503).
+// ErrUnavailable means there is neither a fresh nor a stale result (HTTP 503).
 var ErrUnavailable = errors.New("statystyki są chwilowo niedostępne")
 
 var warsaw = mustLoadLocation("Europe/Warsaw")
@@ -35,12 +35,12 @@ func mustLoadLocation(name string) *time.Location {
 	return loc
 }
 
-// Fetcher pobiera komplet danych. Implementuje go *youtube.Client.
+// Fetcher fetches the complete data. *youtube.Client implements it.
 type Fetcher interface {
 	Fetch(ctx context.Context) (*youtube.Result, error)
 }
 
-// Payload to odpowiedź /yt/stat.json.
+// Payload is the /yt/stat.json response.
 type Payload struct {
 	Stats      Stats   `json:"stats"`
 	Videos     []Video `json:"videos"`
@@ -48,20 +48,20 @@ type Payload struct {
 	Stale      bool    `json:"stale"`
 }
 
-// Stats to liczniki kanału.
+// Stats holds the channel counters.
 type Stats struct {
 	SubscriberCount *string `json:"subscriberCount"`
 	ViewsCount      *string `json:"viewsCount"`
 }
 
-// Video to wiersz tabeli filmów.
+// Video is a row of the videos table.
 type Video struct {
 	VideoID   string  `json:"videoId"`
 	Title     string  `json:"title"`
 	ViewCount *string `json:"viewCount"`
 }
 
-// Options konfiguruje cache. Zerowe pola dostają wartości domyślne.
+// Options configures the cache. Zero fields get default values.
 type Options struct {
 	TTL            time.Duration
 	MaxStaleAge    time.Duration
@@ -72,28 +72,28 @@ type Options struct {
 }
 
 type snapshot struct {
-	payload   Payload // Stale zawsze false
+	payload   Payload // Stale is always false
 	fetchedAt time.Time
 }
 
-// call to jedno trwające pobranie, na które mogą czekać kolejne żądania.
+// call is one in-flight fetch that further requests can wait for.
 type call struct {
 	done chan struct{}
 	err  error
 }
 
-// Cache jest bezpieczny dla wielu goroutyn.
+// Cache is safe for use by multiple goroutines.
 type Cache struct {
 	fetcher Fetcher
 	opt     Options
 
 	mu        sync.Mutex
 	last      *snapshot
-	lastErrAt time.Time // zero, gdy ostatnie pobranie się udało
+	lastErrAt time.Time // zero when the last fetch succeeded
 	inflight  *call
 }
 
-// New tworzy pusty cache.
+// New creates an empty cache.
 func New(f Fetcher, o Options) *Cache {
 	if o.TTL == 0 {
 		o.TTL = DefaultTTL
@@ -116,10 +116,10 @@ func New(f Fetcher, o Options) *Cache {
 	return &Cache{fetcher: f, opt: o}
 }
 
-// Get zwraca świeże dane (nie starsze niż TTL), w razie potrzeby pobierając je.
-// Po błędzie zwraca ostatni wynik nie starszy niż MaxStaleAge ze Stale=true,
-// a bez takiego wyniku ErrUnavailable. Przez ErrorBackoff od błędu nie
-// ponawia pobrania. Anulowanie ctx przerywa tylko czekanie, nie samo pobranie.
+// Get returns fresh data (no older than TTL), fetching it if needed.
+// After an error it returns the last result no older than MaxStaleAge with Stale=true,
+// and ErrUnavailable when there is no such result. For ErrorBackoff after an error
+// it does not retry fetching. Cancelling ctx only stops the wait, not the fetch itself.
 func (c *Cache) Get(ctx context.Context) (*Payload, error) {
 	c.mu.Lock()
 	now := c.opt.Now()
@@ -158,7 +158,7 @@ func (c *Cache) Get(ctx context.Context) (*Payload, error) {
 	return c.fallbackLocked(c.opt.Now())
 }
 
-// refresh pobiera dane niezależnie od żądań, które na nie czekają.
+// refresh fetches data independently of the requests waiting for it.
 func (c *Cache) refresh(cl *call) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.opt.RefreshTimeout)
 	defer cancel()
@@ -206,7 +206,7 @@ func toPayload(r *youtube.Result, at time.Time) Payload {
 	}
 }
 
-// FormatTime zwraca czas w ISO 8601 z przesunięciem strefy Europe/Warsaw.
+// FormatTime returns the time in ISO 8601 with the Europe/Warsaw offset.
 func FormatTime(t time.Time) string {
 	return t.In(warsaw).Format(time.RFC3339)
 }

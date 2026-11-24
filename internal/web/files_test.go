@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// syncBuffer to bufor logów bezpieczny przy równoległych zapisach.
+// syncBuffer is a log buffer safe for concurrent writes.
 type syncBuffer struct {
 	mu sync.Mutex
 	b  bytes.Buffer
@@ -32,7 +32,7 @@ func (s *syncBuffer) String() string {
 
 func newLogger(w io.Writer) *slog.Logger { return slog.New(slog.NewTextHandler(w, nil)) }
 
-// setupDir tworzy komplet poprawnych plików w katalogu tymczasowym.
+// setupDir creates a complete set of valid files in a temporary directory.
 func setupDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -50,8 +50,8 @@ func setupDir(t *testing.T) string {
 	return dir
 }
 
-// write zapisuje plik i ustawia czas modyfikacji, żeby zmiana była
-// wykrywalna niezależnie od rozdzielczości zegara systemu plików.
+// write writes a file and sets its modification time, so the change is
+// detectable regardless of the file system's clock resolution.
 func write(t *testing.T, dir, name, content string, mtime time.Time) {
 	t.Helper()
 	path := filepath.Join(dir, name)
@@ -165,14 +165,14 @@ func TestTemplateBrokenKeepsPrevious(t *testing.T) {
 		t.Errorf("brak wpisu w logu: %s", logs.String())
 	}
 
-	// Błędny plik nie jest parsowany przy każdym żądaniu.
+	// An invalid file is not parsed on every request.
 	before := strings.Count(logs.String(), "błąd w nowej wersji")
 	render(t, f, "index.html")
 	if after := strings.Count(logs.String(), "błąd w nowej wersji"); after != before {
 		t.Errorf("błędny szablon parsowany ponownie bez zmiany pliku (%d → %d)", before, after)
 	}
 
-	// Poprawka pliku jest wczytywana.
+	// A fixed file is loaded.
 	write(t, dir, "index.html", "<p>poprawiony</p>", time.Now().Add(time.Second))
 	if got := render(t, f, "index.html"); got != "<p>poprawiony</p>" {
 		t.Errorf("po poprawce render = %q", got)
@@ -295,7 +295,7 @@ func TestTemplateAssetFunction(t *testing.T) {
 	if !strings.Contains(before, `src="/yt/script.js?v=`) {
 		t.Fatalf("render = %q", before)
 	}
-	// Zmiana samego skryptu (bez zmiany szablonu) daje nowy adres w HTML.
+	// Changing only the script (without changing the template) gives a new URL in the HTML.
 	write(t, dir, "script.js", "// zmiana", time.Now())
 	if after := render(t, f, "index.html"); after == before {
 		t.Error("adres skryptu w HTML nie zmienił się po zmianie pliku")

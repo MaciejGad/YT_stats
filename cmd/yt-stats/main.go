@@ -1,11 +1,11 @@
-// Polecenie yt-stats uruchamia prywatny panel statystyk kanału YouTube.
+// Command yt-stats runs a private statistics panel for a YouTube channel.
 //
-// Użycie:
+// Usage:
 //
-//	yt-stats [-config ścieżka]                 uruchamia serwer
-//	yt-stats hash-password                     tworzy hash Argon2id hasła
-//	yt-stats revoke-sessions [-config ścieżka] usuwa wszystkie sesje
-//	yt-stats check-config [-config ścieżka]    sprawdza konfigurację i pliki
+//	yt-stats [-config path]                 runs the server
+//	yt-stats hash-password                  creates an Argon2id password hash
+//	yt-stats revoke-sessions [-config path] removes all sessions
+//	yt-stats check-config [-config path]    checks the configuration and files
 package main
 
 import (
@@ -22,7 +22,7 @@ import (
 	"syscall"
 	"time"
 
-	_ "time/tzdata" // strefy czasowe niezależne od systemu
+	_ "time/tzdata" // time zones independent of the system
 
 	"yt-stats/internal/auth"
 	"yt-stats/internal/config"
@@ -31,26 +31,26 @@ import (
 	"yt-stats/internal/youtube"
 )
 
-// version ustawia linker: -ldflags "-X main.version=...".
+// version is set by the linker: -ldflags "-X main.version=...".
 var version = "dev"
 
 const defaultConfigPath = "/etc/yt-stats/config.json"
 
-// shutdownTimeout to czas na dokończenie trwających żądań przy
-// zatrzymaniu. Zmienna, żeby test mógł go skrócić.
+// shutdownTimeout is how long in-flight requests get to finish on
+// shutdown. A variable so that a test can shorten it.
 var shutdownTimeout = 10 * time.Second
 
-// env to zależności procesu podmieniane w testach.
+// env holds process dependencies that tests replace.
 type env struct {
 	stdin  io.Reader
 	stdout io.Writer
 	stderr io.Writer
-	// listen otwiera gniazdo nasłuchu; w produkcji net.Listen.
+	// listen opens the listening socket; net.Listen in production.
 	listen func(network, address string) (net.Listener, error)
 }
 
 func main() {
-	// Kontekst kończy się po SIGINT lub SIGTERM (np. systemctl stop).
+	// The context ends on SIGINT or SIGTERM (e.g. systemctl stop).
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	code := run(ctx, os.Args[1:], env{
 		stdin:  os.Stdin,
@@ -96,8 +96,8 @@ Użycie:
 `, version, defaultConfigPath)
 }
 
-// cmdServe wczytuje konfigurację i pliki interfejsu, otwiera gniazdo
-// i obsługuje żądania do zakończenia ctx.
+// cmdServe loads the configuration and interface files, opens the socket
+// and serves requests until ctx is done.
 func cmdServe(ctx context.Context, args []string, e env) int {
 	fs := flag.NewFlagSet("yt-stats", flag.ContinueOnError)
 	fs.SetOutput(e.stderr)
@@ -125,7 +125,7 @@ func cmdServe(ctx context.Context, args []string, e env) int {
 	}
 
 	hash, err := auth.ParseHash(cfg.PasswordHash)
-	if err != nil { // walidacja konfiguracji już to sprawdziła
+	if err != nil { // config validation has already checked this
 		fmt.Fprintf(e.stderr, "password_hash: %v\n", err)
 		return 1
 	}
@@ -175,8 +175,8 @@ func cmdServe(ctx context.Context, args []string, e env) int {
 	return 0
 }
 
-// cmdRevokeSessions usuwa wszystkie sesje. Działa tylko przy zatrzymanej
-// usłudze, bo usługa trzyma blokadę pliku sesji.
+// cmdRevokeSessions removes all sessions. It works only while the service
+// is stopped, because the service holds the session file lock.
 func cmdRevokeSessions(args []string, e env) int {
 	fs := flag.NewFlagSet("revoke-sessions", flag.ContinueOnError)
 	fs.SetOutput(e.stderr)
@@ -206,7 +206,7 @@ func cmdRevokeSessions(args []string, e env) int {
 	return 0
 }
 
-// newServer tworzy serwer HTTP z limitami z wymagań.
+// newServer creates the HTTP server with the limits from the requirements.
 func newServer(h http.Handler, log *slog.Logger) *http.Server {
 	return &http.Server{
 		Handler:           h,
@@ -219,8 +219,8 @@ func newServer(h http.Handler, log *slog.Logger) *http.Server {
 	}
 }
 
-// serve obsługuje żądania na ln do zakończenia ctx, potem zamyka serwer,
-// czekając do shutdownTimeout na trwające żądania. Zamyka ln.
+// serve handles requests on ln until ctx is done, then shuts the server down,
+// waiting up to shutdownTimeout for in-flight requests. It closes ln.
 func serve(ctx context.Context, ln net.Listener, h http.Handler, log *slog.Logger) error {
 	srv := newServer(h, log)
 
@@ -230,7 +230,7 @@ func serve(ctx context.Context, ln net.Listener, h http.Handler, log *slog.Logge
 
 	select {
 	case err := <-errc:
-		// Serve kończy się samo tylko przy błędzie gniazda.
+		// Serve returns on its own only on a socket error.
 		log.Error("serwer zakończył działanie", "err", err)
 		return err
 	case <-ctx.Done():
@@ -251,8 +251,8 @@ func serve(ctx context.Context, ln net.Listener, h http.Handler, log *slog.Logge
 	return nil
 }
 
-// cmdCheckConfig sprawdza konfigurację i pliki interfejsu bez uruchamiania
-// serwera i bez blokowania pliku sesji, więc działa obok pracującej usługi.
+// cmdCheckConfig checks the configuration and interface files without starting
+// the server or locking the session file, so it works next to a running service.
 func cmdCheckConfig(args []string, e env) int {
 	fs := flag.NewFlagSet("check-config", flag.ContinueOnError)
 	fs.SetOutput(e.stderr)

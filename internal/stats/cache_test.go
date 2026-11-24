@@ -23,15 +23,15 @@ type clock struct {
 func (c *clock) Now() time.Time      { c.mu.Lock(); defer c.mu.Unlock(); return c.t }
 func (c *clock) Add(d time.Duration) { c.mu.Lock(); c.t = c.t.Add(d); c.mu.Unlock() }
 
-// fakeFetcher zwraca wynik z kolejnym numerem albo ustawiony błąd.
+// fakeFetcher returns a result with a sequence number or the configured error.
 type fakeFetcher struct {
 	calls   atomic.Int32
 	mu      sync.Mutex
 	err     error
 	nilRes  bool
-	gate    chan struct{} // gdy ustawiony, Fetch czeka na jego zamknięcie
-	started chan struct{} // dostaje sygnał przy starcie Fetch
-	waitCtx bool          // Fetch czeka na koniec kontekstu
+	gate    chan struct{} // when set, Fetch waits for it to be closed
+	started chan struct{} // signalled when Fetch starts
+	waitCtx bool          // Fetch waits for the context to end
 }
 
 func (f *fakeFetcher) Fetch(ctx context.Context) (*youtube.Result, error) {
@@ -57,7 +57,7 @@ func (f *fakeFetcher) Fetch(ctx context.Context) (*youtube.Result, error) {
 	views := "100"
 	return &youtube.Result{
 		SubscriberCount: ptr("42"),
-		ViewCount:       ptr(strings.Repeat("9", int(n))), // różny przy każdym pobraniu
+		ViewCount:       ptr(strings.Repeat("9", int(n))), // different on every fetch
 		Videos: []youtube.Video{
 			{ID: "abc", Title: "Pierwszy", ViewCount: &views},
 			{ID: "def", Title: "Ukryty licznik"},
@@ -95,7 +95,7 @@ func mustGet(t *testing.T, c *Cache) *Payload {
 
 var errAPI = errors.New("awaria API")
 
-// --- świeżość ---
+// --- freshness ---
 
 func TestFirstGetFetches(t *testing.T) {
 	f := &fakeFetcher{}
@@ -159,7 +159,7 @@ func TestConcurrentGetsShareOneFetch(t *testing.T) {
 		}()
 	}
 	<-f.started
-	time.Sleep(20 * time.Millisecond) // pozostałe żądania dołączają do trwającego pobrania
+	time.Sleep(20 * time.Millisecond) // the other requests join the in-flight fetch
 	close(f.gate)
 	wg.Wait()
 	close(results)
@@ -179,7 +179,7 @@ func TestConcurrentGetsShareOneFetch(t *testing.T) {
 	}
 }
 
-// --- błędy i dane awaryjne ---
+// --- errors and stale data ---
 
 func TestErrorWithoutDataUnavailable(t *testing.T) {
 	f := &fakeFetcher{err: errAPI}
@@ -234,7 +234,7 @@ func TestBackoffAfterError(t *testing.T) {
 	calls := f.calls.Load()
 
 	for range 5 {
-		clk.Add(5 * time.Second) // łącznie 25 s od błędu
+		clk.Add(5 * time.Second) // 25 s since the error in total
 		if p := mustGet(t, c); !p.Stale {
 			t.Error("w oknie przerwy oczekiwano danych awaryjnych")
 		}
@@ -243,7 +243,7 @@ func TestBackoffAfterError(t *testing.T) {
 		t.Errorf("w ciągu 30 s od błędu wykonano %d nowych pobrań", f.calls.Load()-calls)
 	}
 
-	clk.Add(6 * time.Second) // 31 s od błędu
+	clk.Add(6 * time.Second) // 31 s since the error
 	mustGet(t, c)
 	if f.calls.Load() != calls+1 {
 		t.Errorf("po 30 s oczekiwano nowej próby, pobrań: %d", f.calls.Load()-calls)
@@ -272,7 +272,7 @@ func TestRecoveryAfterError(t *testing.T) {
 	if p := mustGet(t, c); p.Stale {
 		t.Error("po udanym pobraniu stale powinno być false")
 	}
-	// Stan błędu jest wyczyszczony: po TTL zwykłe odświeżenie.
+	// The error state is cleared: a normal refresh after TTL.
 	clk.Add(61 * time.Second)
 	mustGet(t, c)
 	if f.calls.Load() != 3 {
@@ -287,7 +287,7 @@ func TestNilResultIsError(t *testing.T) {
 	}
 }
 
-// --- konteksty i limity czasu ---
+// --- contexts and timeouts ---
 
 func TestCancelledRequestDoesNotAbortFetch(t *testing.T) {
 	f := &fakeFetcher{gate: make(chan struct{}), started: make(chan struct{}, 1)}
@@ -303,7 +303,7 @@ func TestCancelledRequestDoesNotAbortFetch(t *testing.T) {
 	}
 
 	close(f.gate)
-	// Pobranie dokończyło się w tle; kolejne żądanie korzysta z wyniku.
+	// The fetch finished in the background; the next request uses the result.
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		p, err := c.Get(context.Background())
@@ -344,10 +344,10 @@ func TestDefaults(t *testing.T) {
 
 func TestUpdateTimeFormat(t *testing.T) {
 	cases := map[string]string{
-		"2026-11-23T21:45:10Z": "2026-11-23T22:45:10+01:00", // zima
-		"2026-07-01T10:00:00Z": "2026-07-01T12:00:00+02:00", // lato
-		"2026-03-29T00:59:59Z": "2026-03-29T01:59:59+01:00", // tuż przed zmianą na letni
-		"2026-03-29T01:00:00Z": "2026-03-29T03:00:00+02:00", // tuż po zmianie
+		"2026-11-23T21:45:10Z": "2026-11-23T22:45:10+01:00", // winter
+		"2026-07-01T10:00:00Z": "2026-07-01T12:00:00+02:00", // summer
+		"2026-03-29T00:59:59Z": "2026-03-29T01:59:59+01:00", // just before the switch to summer time
+		"2026-03-29T01:00:00Z": "2026-03-29T03:00:00+02:00", // just after the switch
 	}
 	for in, want := range cases {
 		ts, _ := time.Parse(time.RFC3339, in)

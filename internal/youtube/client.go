@@ -1,4 +1,4 @@
-// Package youtube pobiera statystyki kanału i jego filmów z YouTube Data API v3.
+// Package youtube fetches channel and video statistics from YouTube Data API v3.
 package youtube
 
 import (
@@ -13,44 +13,44 @@ import (
 	"strings"
 	"time"
 
-	_ "time/tzdata" // America/Los_Angeles do odnowienia limitu
+	_ "time/tzdata" // America/Los_Angeles for the quota reset
 )
 
-// Domyślne wartości z wymagań.
+// Default values from the requirements.
 const (
 	DefaultBaseURL          = "https://www.googleapis.com/youtube/v3/"
 	DefaultRequestTimeout   = 10 * time.Second
 	DefaultMaxResponseBytes = 5 << 20
 	DefaultMaxPages         = 200
-	pageSize                = 50 // maksimum API dla playlistItems i videos
+	pageSize                = 50 // the API maximum for playlistItems and videos
 )
 
-// ErrChannelNotFound oznacza, że API nie zwróciło kanału o podanym ID.
+// ErrChannelNotFound means the API returned no channel with the given ID.
 var ErrChannelNotFound = errors.New("YouTube API: nie znaleziono kanału")
 
-// ErrTooManyPages oznacza przekroczenie limitu stron playlisty.
+// ErrTooManyPages means the playlist page limit was exceeded.
 var ErrTooManyPages = errors.New("YouTube API: przekroczono limit stron playlisty")
 
-// Result to wynik jednego pełnego pobrania. Liczniki to ciągi cyfr
-// albo nil, gdy API ich nie udostępnia.
+// Result is the result of one complete fetch. Counters are digit strings
+// or nil when the API does not provide them.
 type Result struct {
 	SubscriberCount *string
 	ViewCount       *string
 	Videos          []Video
 }
 
-// Video to film z playlisty przesłanych filmów.
+// Video is a video from the uploads playlist.
 type Video struct {
 	ID        string
 	Title     string
 	ViewCount *string
 }
 
-// Options konfiguruje klienta. Zerowe pola dostają wartości domyślne.
+// Options configures the client. Zero fields get default values.
 type Options struct {
 	ChannelID      string
 	APIKey         string
-	APIKeyFallback string // opcjonalny
+	APIKeyFallback string // optional
 
 	BaseURL          string
 	HTTPClient       *http.Client
@@ -61,7 +61,7 @@ type Options struct {
 	Log              *slog.Logger
 }
 
-// Client wykonuje zapytania do API. Bezpieczny dla wielu goroutyn.
+// Client makes API requests. Safe for use by multiple goroutines.
 type Client struct {
 	channelID   string
 	base        *url.URL
@@ -74,7 +74,7 @@ type Client struct {
 	secretWords []string
 }
 
-// New tworzy klienta.
+// New creates a client.
 func New(o Options) (*Client, error) {
 	if o.ChannelID == "" || o.APIKey == "" {
 		return nil, errors.New("youtube: brak ID kanału lub klucza API")
@@ -121,8 +121,8 @@ func New(o Options) (*Client, error) {
 	}, nil
 }
 
-// Fetch pobiera statystyki kanału i wszystkie filmy z playlisty przesłanych.
-// Zwraca wynik tylko wtedy, gdy udało się pobrać całość.
+// Fetch gets the channel statistics and all videos from the uploads playlist.
+// It returns a result only when everything was fetched.
 func (c *Client) Fetch(ctx context.Context) (*Result, error) {
 	res, err := c.fetch(ctx)
 	if err != nil {
@@ -193,7 +193,7 @@ func (c *Client) channel(ctx context.Context) (*channelInfo, error) {
 	return info, nil
 }
 
-// playlistVideoIDs zwraca ID filmów w kolejności playlisty, bez duplikatów.
+// playlistVideoIDs returns video IDs in playlist order, without duplicates.
 func (c *Client) playlistVideoIDs(ctx context.Context, playlistID string) ([]string, error) {
 	var ids []string
 	seen := map[string]bool{}
@@ -222,7 +222,7 @@ func (c *Client) playlistVideoIDs(ctx context.Context, playlistID string) ([]str
 		err := c.get(ctx, "playlistItems", q, &resp)
 		var apiErr *APIError
 		if page == 0 && errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound && apiErr.Reason == "playlistNotFound" {
-			// Kanał bez filmów nie ma playlisty przesłanych.
+			// A channel without videos has no uploads playlist.
 			return nil, nil
 		}
 		if err != nil {
@@ -246,8 +246,8 @@ func (c *Client) playlistVideoIDs(ctx context.Context, playlistID string) ([]str
 	}
 }
 
-// videos pobiera tytuły i liczniki grupami po 50, zachowując kolejność ids.
-// Filmy, których API nie zwróciło (prywatne, usunięte), są pomijane.
+// videos fetches titles and counters in batches of 50, keeping the order of ids.
+// Videos the API did not return (private, deleted) are skipped.
 func (c *Client) videos(ctx context.Context, ids []string) ([]Video, error) {
 	byID := make(map[string]Video, len(ids))
 	for start := 0; start < len(ids); start += pageSize {
@@ -284,8 +284,8 @@ func (c *Client) videos(ctx context.Context, ids []string) ([]Video, error) {
 	return out, nil
 }
 
-// get wykonuje jedno zapytanie, a przy wyczerpaniu limitu klucza głównego
-// ponawia je kluczem zapasowym.
+// get makes one request and, when the primary key's quota is exhausted,
+// retries it with the fallback key.
 func (c *Client) get(ctx context.Context, endpoint string, q url.Values, out any) error {
 	key, label := c.keys.current()
 	err := c.do(ctx, endpoint, q, key, out)
@@ -306,7 +306,7 @@ func (c *Client) do(ctx context.Context, endpoint string, q url.Values, key stri
 	if err != nil {
 		return err
 	}
-	// Klucz w nagłówku, a nie w URL, żeby nie trafiał do komunikatów błędów.
+	// The key goes in a header, not in the URL, so it never ends up in error messages.
 	req.Header.Set("X-Goog-Api-Key", key)
 	req.Header.Set("Accept", "application/json")
 
@@ -332,8 +332,8 @@ func (c *Client) do(ctx context.Context, endpoint string, q url.Values, key stri
 	return nil
 }
 
-// counter zwraca wskaźnik do licznika albo nil, gdy brak wartości lub nie
-// jest ciągiem cyfr.
+// counter returns a pointer to the counter, or nil when there is no value or it
+// is not a digit string.
 func counter(s string) *string {
 	if s == "" {
 		return nil
@@ -346,8 +346,8 @@ func counter(s string) *string {
 	return &s
 }
 
-// redact usuwa klucze API z komunikatu błędu, zachowując możliwość
-// sprawdzania errors.Is / errors.As.
+// redact removes API keys from an error message while keeping
+// errors.Is / errors.As working.
 func (c *Client) redact(err error) error {
 	msg := err.Error()
 	clean := msg

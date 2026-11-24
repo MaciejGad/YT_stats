@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Instaluje lub aktualizuje yt-stats na serwerze. Uruchamiany jako root
-# z rozpakowanej paczki z deploy/build.sh:
+# Installs or updates yt-stats on the server. Run as root
+# from the unpacked package built by deploy/build.sh:
 #
 #   sudo ./install.sh
 #
-# Co robi (bezpiecznie przy wielokrotnym uruchomieniu):
-#   - zakłada użytkownika systemowego yt-stats,
-#   - kopiuje binarkę do /opt/yt-stats/ i pliki interfejsu do /opt/yt-stats/web/,
-#     zachowując poprzednią wersję jako *.prev (do wycofania),
-#   - przy pierwszej instalacji tworzy /etc/yt-stats/config.json z przykładu
-#     i kończy pracę, żebyś uzupełnił klucz API i hash hasła,
-#   - sprawdza konfigurację (check-config) i dopiero wtedy restartuje usługę.
+# What it does (safe to run repeatedly):
+#   - creates the yt-stats system user,
+#   - copies the binary to /opt/yt-stats/ and the interface files to /opt/yt-stats/web/,
+#     keeping the previous version as *.prev (for rollback),
+#   - on the first installation creates /etc/yt-stats/config.json from the example
+#     and exits, so you can fill in the API key and the password hash,
+#   - checks the configuration (check-config) and only then restarts the service.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -26,7 +26,7 @@ die() { echo "BŁĄD: $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die "uruchom jako root (sudo ./install.sh)"
 [ -x ./yt-stats ] && [ -d ./web ] || die "uruchom z katalogu rozpakowanej paczki"
 
-# Architektura paczki musi pasować do serwera.
+# The package architecture must match the server.
 want="$(cat ARCH)"
 case "$(uname -m)" in
   x86_64) have=amd64 ;;
@@ -62,6 +62,7 @@ if [ -d "$APP_DIR/web" ]; then
 fi
 mv "$APP_DIR/web.new" "$APP_DIR/web"
 install -o root -g root -m 0644 ./README.md "$APP_DIR/README.md"
+install -o root -g root -m 0644 ./README_pl.md "$APP_DIR/README_pl.md"
 echo "wersja $(cat VERSION)"
 
 echo "==> Konfiguracja w $CONF"
@@ -82,7 +83,7 @@ fi
 chown root:"$SERVICE" "$CONF"
 chmod 0640 "$CONF"
 
-# Sprawdzenie jako użytkownik usługi: te same uprawnienia co w działającej usłudze.
+# Check as the service user: the same permissions as the running service.
 if ! runuser -u "$SERVICE" -- "$APP_DIR/yt-stats" check-config -config "$CONF"; then
   die "konfiguracja jest niepoprawna; usługa nie została zrestartowana"
 fi
@@ -103,8 +104,8 @@ if ! systemctl is-active --quiet "$SERVICE"; then
 fi
 
 if command -v curl >/dev/null; then
-  # systemd zgłasza „active” zaraz po starcie procesu, zanim serwer otworzy
-  # port, więc czekamy do 10 s na odpowiedź.
+  # systemd reports "active" right after the process starts, before the server
+  # opens the port, so we wait up to 10 s for a response.
   code=000
   for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
     code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8091/yt/login || true)"

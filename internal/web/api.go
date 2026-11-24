@@ -11,12 +11,12 @@ import (
 	"yt-stats/internal/stats"
 )
 
-// contentSecurityPolicy pozwala tylko na zasoby z własnego adresu. Strona
-// nie ma skryptów ani stylów inline.
+// contentSecurityPolicy allows only resources from our own origin. The page
+// has no inline scripts or styles.
 const contentSecurityPolicy = "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 
-// securityHeaders dodaje nagłówki bezpieczeństwa do każdej odpowiedzi,
-// także 404 i 405.
+// securityHeaders adds security headers to every response,
+// including 404 and 405.
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -27,8 +27,8 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// handleStats zwraca statystyki jako JSON. Bez sesji zwraca 401 i nie
-// odpytuje YouTube.
+// handleStats returns the statistics as JSON. Without a session it returns 401
+// and does not query YouTube.
 func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.session(w, r); !ok {
 		writeJSON(w, http.StatusUnauthorized, errorBody{"Brak ważnej sesji. Zaloguj się ponownie."})
@@ -42,7 +42,7 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Retry-After", "30")
 		writeJSON(w, http.StatusServiceUnavailable, errorBody{"Nie udało się pobrać statystyk z YouTube. Spróbuj ponownie za chwilę."})
 	case errors.Is(err, context.Canceled):
-		// Klient zamknął połączenie; pobranie trwa dalej w tle.
+		// The client closed the connection; the fetch continues in the background.
 	default:
 		s.Log.Error("statystyki", "err", err)
 		writeJSON(w, http.StatusInternalServerError, errorBody{"Błąd serwera."})
@@ -66,7 +66,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Write(data)
 }
 
-// staticTypes to typy MIME plików statycznych.
+// staticTypes are the MIME types of static files.
 var staticTypes = map[string]string{
 	".js":  "text/javascript; charset=utf-8",
 	".css": "text/css; charset=utf-8",
@@ -74,9 +74,9 @@ var staticTypes = map[string]string{
 	".png": "image/png",
 }
 
-// handleStatic serwuje plik z web_dir. Przeglądarka przy każdym użyciu
-// pyta o zmiany (no-cache) i dostaje 304, gdy ETag się zgadza. Dzięki temu
-// zmiana pliku na serwerze jest widoczna po zwykłym przeładowaniu strony.
+// handleStatic serves a file from web_dir. The browser asks for changes
+// on every use (no-cache) and gets 304 when the ETag matches. Thanks to that
+// a change to a file on the server is visible after a normal page reload.
 func (s *server) handleStatic(name string) http.HandlerFunc {
 	ctype := staticTypes[path.Ext(name)]
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -90,8 +90,8 @@ func (s *server) handleStatic(name string) http.HandlerFunc {
 		h.Set("Content-Type", ctype)
 		h.Set("ETag", f.ETag)
 		if v := r.URL.Query().Get("v"); v != "" && v == f.Version() {
-			// Adres z aktualną wersją nigdy nie zmieni treści: można go
-			// trzymać w cache bez pytania serwera.
+			// A URL with the current version never changes its content: it can be
+			// cached without asking the server.
 			h.Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
 			h.Set("Cache-Control", "no-cache")

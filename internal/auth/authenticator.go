@@ -8,23 +8,23 @@ import (
 	"time"
 )
 
-// Limity z wymagań.
+// Limits from the requirements.
 const (
 	MaxUsernameLen       = 64
 	DefaultMaxConcurrent = 2
 	DefaultWaitTimeout   = 3 * time.Second
 )
 
-// ErrBusy oznacza, że wszystkie miejsca na weryfikację hasła są zajęte
-// dłużej niż czas oczekiwania (HTTP 503).
+// ErrBusy means that all password verification slots have been busy
+// for longer than the wait time (HTTP 503).
 var ErrBusy = errors.New("zbyt wiele równoległych weryfikacji hasła")
 
-// Verifier sprawdza hasło. Implementuje go *Hash.
+// Verifier checks a password. *Hash implements it.
 type Verifier interface {
 	Verify(password []byte) bool
 }
 
-// Authenticator sprawdza nazwę użytkownika i hasło jednego konta.
+// Authenticator checks the username and password of the single account.
 type Authenticator struct {
 	username []byte
 	real     Verifier
@@ -33,16 +33,16 @@ type Authenticator struct {
 	wait     time.Duration
 }
 
-// AuthOptions konfiguruje Authenticator. Zerowe pola dają wartości domyślne.
+// AuthOptions configures an Authenticator. Zero fields get default values.
 type AuthOptions struct {
 	MaxConcurrent int
 	WaitTimeout   time.Duration
-	// Dummy zastępuje fikcyjny hash (testy). Domyślnie hash losowego hasła
-	// z tymi samymi parametrami co prawdziwy, żeby czas był taki sam.
+	// Dummy replaces the dummy hash (tests). By default it is the hash of a random
+	// password with the same parameters as the real one, so timing is the same.
 	Dummy Verifier
 }
 
-// NewAuthenticator tworzy weryfikator dla konta z konfiguracji.
+// NewAuthenticator creates a verifier for the account from the configuration.
 func NewAuthenticator(username string, hash *Hash, o AuthOptions) (*Authenticator, error) {
 	return newAuthenticator(username, hash, hash.Params, o)
 }
@@ -78,16 +78,16 @@ func newAuthenticator(username string, real Verifier, p Params, o AuthOptions) (
 	}, nil
 }
 
-// Check zwraca true dla poprawnej pary nazwa–hasło. Przy nieznanej nazwie
-// i tak wykonuje Argon2id (na fikcyjnym hashu), żeby czas odpowiedzi nie
-// zdradzał poprawności nazwy. Za długie dane są odrzucane bez Argon2id.
+// Check returns true for a correct username–password pair. For an unknown
+// username it still runs Argon2id (on the dummy hash), so the response time
+// does not reveal whether the username is correct. Oversized input is rejected without Argon2id.
 func (a *Authenticator) Check(ctx context.Context, username, password string) (bool, error) {
 	if username == "" || password == "" || len(username) > MaxUsernameLen || len(password) > MaxPasswordLen {
 		return false, nil
 	}
 
-	// select wybiera losowo spośród gotowych przypadków, więc anulowane
-	// żądanie sprawdzamy przed próbą zajęcia miejsca.
+	// select picks randomly among ready cases, so a cancelled request
+	// is checked before trying to take a slot.
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}

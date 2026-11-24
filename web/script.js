@@ -1,6 +1,6 @@
-// Panel statystyk YarnPower: pobiera /yt/stat.json przy wejściu i po
-// kliknięciu „Odśwież”. Tytuły trafiają do DOM wyłącznie przez textContent,
-// a linki powstają tylko z identyfikatorów filmów.
+// YarnPower statistics panel: fetches /yt/stat.json on load and when
+// "Odśwież" (Refresh) is clicked. Titles reach the DOM only through textContent,
+// and links are built only from video IDs.
 'use strict';
 
 (function (root) {
@@ -21,15 +21,15 @@
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   });
 
-  // --- funkcje bez DOM (testowane w script.test.js) ---
+  // --- DOM-free functions (tested in script.test.js) ---
 
-  /** Liczba jako tekst pl-PL albo null, gdy licznik jest niedostępny. */
+  /** The number as pl-PL text, or null when the counter is unavailable. */
   function formatCount(value) {
     if (value === null || value === undefined || !/^\d+$/.test(String(value))) return null;
     return numberFormat.format(Number(value));
   }
 
-  /** Czas ISO 8601 w strefie Europe/Warsaw. */
+  /** An ISO 8601 time in the Europe/Warsaw zone. */
   function formatTime(iso, short) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '—';
@@ -40,7 +40,7 @@
     return v === null || v === undefined || !/^\d+$/.test(String(v)) ? -1 : Number(v);
   }
 
-  /** Kopia listy w wybranej kolejności. Filmy bez licznika trafiają na koniec. */
+  /** A copy of the list in the chosen order. Videos without a counter go last. */
   function sortVideos(videos, mode) {
     const list = videos.map((v, i) => ({ v, i }));
     if (mode === 'views') {
@@ -53,7 +53,7 @@
     return WATCH_URL + encodeURIComponent(String(id));
   }
 
-  /** Procent wyświetleń względem najpopularniejszego filmu (0–100). */
+  /** Views as a percentage of the most popular video (0–100). */
   function shareOf(value, max) {
     const n = countValue(value);
     if (n <= 0 || max <= 0) return 0;
@@ -65,7 +65,7 @@
     return;
   }
 
-  // --- przeglądarka ---
+  // --- browser ---
 
   const doc = root.document;
   const $ = (id) => doc.getElementById(id);
@@ -180,7 +180,7 @@
       showStatus('error', message + ' Pokazuję wcześniej pobrane dane.', true);
       return;
     }
-    // Bez danych: usuń szkielety, żeby nie udawały ładowania.
+    // No data: remove the skeletons so they do not pretend to be loading.
     els.rows.replaceChildren();
     for (const el of [els.subscribers, els.views, els.videoCount]) {
       el.textContent = '—';

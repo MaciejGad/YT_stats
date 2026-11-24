@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// --- sesje przed logowaniem ---
+// --- pre-login sessions ---
 
 func TestPreLoginEnsureAndCheck(t *testing.T) {
 	clk := newTestClock()
@@ -20,7 +20,7 @@ func TestPreLoginEnsureAndCheck(t *testing.T) {
 	if err != nil || !created || !validToken(id) || !validToken(csrf) {
 		t.Fatalf("Ensure: %q %q %v %v", id, csrf, created, err)
 	}
-	// Ta sama sesja zwraca ten sam token.
+	// The same session returns the same token.
 	id2, csrf2, created2, _ := p.Ensure(id)
 	if id2 != id || csrf2 != csrf || created2 {
 		t.Error("istniejąca sesja powinna zostać użyta ponownie")
@@ -126,7 +126,7 @@ func TestLimiterPerIP(t *testing.T) {
 	if ok {
 		t.Fatal("6. próba powinna być zablokowana")
 	}
-	// Pierwsza porażka była 5 s temu → odblokowanie za 15 min − 5 s.
+	// The first failure was 5 s ago → unblocked in 15 min − 5 s.
 	if wait != 15*time.Minute-5*time.Second {
 		t.Errorf("wait = %v", wait)
 	}
@@ -146,11 +146,11 @@ func TestLimiterSlidingWindow(t *testing.T) {
 		l.Failure("ip")
 	}
 	clk.Add(14 * time.Minute)
-	l.Failure("ip") // 5. porażka
+	l.Failure("ip") // 5th failure
 	if ok, _ := l.Allow("ip"); ok {
 		t.Fatal("5 porażek w 15 min powinno blokować")
 	}
-	clk.Add(time.Minute) // pierwsze 4 wypadają z okna
+	clk.Add(time.Minute) // the first 4 drop out of the window
 	if ok, _ := l.Allow("ip"); !ok {
 		t.Error("po wypadnięciu starych porażek adres powinien być odblokowany")
 	}
@@ -245,9 +245,9 @@ func TestLimiterCleansAfterWindow(t *testing.T) {
 	}
 }
 
-// --- weryfikacja hasła ---
+// --- password verification ---
 
-// countingVerifier liczy wywołania i opcjonalnie czeka.
+// countingVerifier counts calls and optionally waits.
 type countingVerifier struct {
 	password string
 	delay    time.Duration
@@ -331,7 +331,7 @@ func TestAuthLengthLimitsSkipArgon(t *testing.T) {
 	if real.calls.Load()+dummy.calls.Load() != 0 {
 		t.Error("za długie lub puste dane nie powinny uruchamiać Argon2id")
 	}
-	// Granice są dozwolone.
+	// The boundaries are allowed.
 	if _, err := a.Check(ctx, strings.Repeat("a", 64), strings.Repeat("a", 256)); err != nil {
 		t.Error(err)
 	}
@@ -373,7 +373,7 @@ func TestAuthBusyAfterWait(t *testing.T) {
 		wg.Add(1)
 		go func() { defer wg.Done(); a.Check(context.Background(), "yarn", "dobre hasło") }()
 	}
-	time.Sleep(20 * time.Millisecond) // obie weryfikacje zajęły miejsca
+	time.Sleep(20 * time.Millisecond) // both verifications have taken slots
 	_, err := a.Check(context.Background(), "yarn", "dobre hasło")
 	if !errors.Is(err, ErrBusy) {
 		t.Errorf("oczekiwano ErrBusy, jest %v", err)
@@ -418,7 +418,7 @@ func TestAuthCancelledContextNeverVerifies(t *testing.T) {
 	a, real, _ := newTestAuth(t, AuthOptions{})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	for range 50 { // select wybierałby losowo; sprawdzenie musi być deterministyczne
+	for range 50 { // select would pick randomly; the check must be deterministic
 		if ok, err := a.Check(ctx, "yarn", "dobre hasło"); ok || !errors.Is(err, context.Canceled) {
 			t.Fatalf("ok=%v err=%v", ok, err)
 		}

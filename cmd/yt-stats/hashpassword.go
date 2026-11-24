@@ -13,7 +13,7 @@ import (
 	"yt-stats/internal/auth"
 )
 
-// secretReader wypisuje zachętę i czyta jedno hasło.
+// secretReader prints a prompt and reads one password.
 type secretReader func(prompt string) ([]byte, error)
 
 func cmdHashPassword(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -30,7 +30,7 @@ func cmdHashPassword(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 	return 0
 }
 
-// hashPasswordInteractive czyta hasło dwa razy i zwraca hash Argon2id.
+// hashPasswordInteractive reads the password twice and returns an Argon2id hash.
 func hashPasswordInteractive(read secretReader) (string, error) {
 	first, err := read("Hasło: ")
 	if err != nil {
@@ -49,8 +49,8 @@ func hashPasswordInteractive(read secretReader) (string, error) {
 	return auth.HashPassword(first, auth.DefaultParams)
 }
 
-// newSecretReader czyta bez echa z terminala. Gdy wejście nie jest
-// terminalem (np. potok w skrypcie), czyta kolejne wiersze.
+// newSecretReader reads from the terminal without echo. When the input is not
+// a terminal (e.g. a pipe in a script), it reads consecutive lines.
 func newSecretReader(stdin io.Reader, prompt io.Writer) secretReader {
 	if f, ok := stdin.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
 		fd := int(f.Fd())

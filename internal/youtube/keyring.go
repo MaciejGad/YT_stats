@@ -6,13 +6,13 @@ import (
 	"time"
 )
 
-// Etykiety kluczy w logach. Wartości kluczy nigdy nie są logowane.
+// Key labels in logs. Key values are never logged.
 const (
 	keyPrimary  = "primary"
 	keyFallback = "fallback"
 )
 
-// quotaZone to strefa, w której YouTube odnawia dzienny limit (północ czasu pacyficznego).
+// quotaZone is the zone in which YouTube resets the daily quota (Pacific midnight).
 var quotaZone = mustLoadLocation("America/Los_Angeles")
 
 func mustLoadLocation(name string) *time.Location {
@@ -23,14 +23,14 @@ func mustLoadLocation(name string) *time.Location {
 	return loc
 }
 
-// nextQuotaReset zwraca najbliższą północ czasu pacyficznego po t.
+// nextQuotaReset returns the next Pacific midnight after t.
 func nextQuotaReset(t time.Time) time.Time {
 	l := t.In(quotaZone)
 	return time.Date(l.Year(), l.Month(), l.Day()+1, 0, 0, 0, 0, quotaZone)
 }
 
-// keyring wybiera klucz API. Po wyczerpaniu limitu klucza głównego używa
-// zapasowego do najbliższego odnowienia limitu.
+// keyring chooses the API key. After the primary key's quota is exhausted it uses
+// the fallback until the next quota reset.
 type keyring struct {
 	primary, fallback string
 	now               func() time.Time
@@ -44,7 +44,7 @@ func newKeyring(primary, fallback string, now func() time.Time, log *slog.Logger
 	return &keyring{primary: primary, fallback: fallback, now: now, log: log}
 }
 
-// current zwraca aktualny klucz i jego etykietę.
+// current returns the current key and its label.
 func (k *keyring) current() (key, label string) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
@@ -58,8 +58,8 @@ func (k *keyring) current() (key, label string) {
 	return k.primary, keyPrimary
 }
 
-// exhausted zgłasza wyczerpanie limitu klucza o etykiecie label. Zwraca true,
-// gdy po zgłoszeniu warto ponowić żądanie innym kluczem.
+// exhausted reports that the quota of the key labelled label is exhausted. It returns true
+// when it is worth retrying the request with another key.
 func (k *keyring) exhausted(label string) bool {
 	k.mu.Lock()
 	defer k.mu.Unlock()
@@ -73,7 +73,7 @@ func (k *keyring) exhausted(label string) bool {
 	}
 	now := k.now()
 	if now.Before(k.fallbackUntil) {
-		// Inne żądanie już przełączyło klucz.
+		// Another request has already switched the key.
 		return true
 	}
 	k.fallbackUntil = nextQuotaReset(now)

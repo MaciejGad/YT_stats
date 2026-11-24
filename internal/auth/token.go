@@ -8,13 +8,13 @@ import (
 	"encoding/hex"
 )
 
-// tokenBytes to długość losowych identyfikatorów (sesje, CSRF).
+// tokenBytes is the length of random identifiers (sessions, CSRF).
 const tokenBytes = 32
 
-// tokenLen to długość identyfikatora po zakodowaniu base64url bez dopełnienia.
+// tokenLen is the identifier length after base64url encoding without padding.
 var tokenLen = base64.RawURLEncoding.EncodedLen(tokenBytes)
 
-// newToken zwraca 32 losowe bajty zakodowane base64url (43 znaki).
+// newToken returns 32 random bytes encoded as base64url (43 characters).
 func newToken() (string, error) {
 	b := make([]byte, tokenBytes)
 	if _, err := rand.Read(b); err != nil {
@@ -23,7 +23,7 @@ func newToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-// validToken sprawdza format identyfikatora, zanim trafi do dalszej obróbki.
+// validToken checks the identifier format before any further processing.
 func validToken(s string) bool {
 	if len(s) != tokenLen {
 		return false
@@ -37,23 +37,23 @@ func validToken(s string) bool {
 	return true
 }
 
-// hashToken zwraca hash SHA-256 identyfikatora w zapisie szesnastkowym.
-// Tylko ta postać trafia do pliku sesji.
+// hashToken returns the SHA-256 hash of an identifier in hex.
+// Only this form goes into the session file.
 func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
 }
 
-// LogoutToken wyprowadza token CSRF formularza wylogowania z identyfikatora
-// sesji. Nie wymaga przechowywania, a bez identyfikatora sesji nie da się go
-// obliczyć.
+// LogoutToken derives the logout form's CSRF token from the session
+// identifier. It needs no storage, and it cannot be computed without the
+// session identifier.
 func LogoutToken(sessionToken string) string {
 	m := hmac.New(sha256.New, []byte(sessionToken))
 	m.Write([]byte("yt-stats logout csrf"))
 	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
 }
 
-// CheckLogoutToken porównuje token formularza wylogowania w stałym czasie.
+// CheckLogoutToken compares the logout form token in constant time.
 func CheckLogoutToken(sessionToken, formToken string) bool {
 	return hmac.Equal([]byte(LogoutToken(sessionToken)), []byte(formToken))
 }

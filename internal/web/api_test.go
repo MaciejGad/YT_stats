@@ -17,7 +17,7 @@ import (
 	"yt-stats/internal/stats"
 )
 
-// fakeStats zastępuje cache statystyk.
+// fakeStats replaces the statistics cache.
 type fakeStats struct {
 	calls   atomic.Int32
 	payload *stats.Payload
@@ -184,7 +184,7 @@ func TestStatsMethodNotAllowed(t *testing.T) {
 	}
 }
 
-// --- pliki statyczne ---
+// --- static files ---
 
 func TestStaticFiles(t *testing.T) {
 	a := newApp(t, fastParams, auth.AuthOptions{})
@@ -234,7 +234,7 @@ func TestStaticHead(t *testing.T) {
 
 func TestStaticReloadWithoutRestart(t *testing.T) {
 	a := newApp(t, fastParams, auth.AuthOptions{})
-	// Kopia web/ w katalogu tymczasowym, żeby móc ją zmieniać.
+	// A copy of web/ in a temporary directory, so it can be changed.
 	dir := t.TempDir()
 	for _, n := range append(append([]string{}, TemplateNames...), StaticNames...) {
 		data, err := os.ReadFile(filepath.Join("../../web", n))
@@ -267,7 +267,7 @@ func TestStaticReloadWithoutRestart(t *testing.T) {
 	}
 }
 
-// --- nagłówki bezpieczeństwa ---
+// --- security headers ---
 
 func TestSecurityHeadersEverywhere(t *testing.T) {
 	a, b := loggedIn(t)
@@ -302,10 +302,10 @@ func TestSecurityHeadersEverywhere(t *testing.T) {
 	}
 }
 
-// --- trasy i dawne adresy ---
+// --- routes and old URLs ---
 
 func TestOldAndUnknownPaths(t *testing.T) {
-	_, b := loggedIn(t) // nawet z sesją
+	_, b := loggedIn(t) // even with a session
 	for _, p := range []string{
 		"/yt/index.php", "/yt/stat.php", "/yt/functions.php", "/yt/require_auth.php",
 		"/yt/graph_data.php", "/yt/cron.php", "/yt/cron.sh", "/yt/statistics.csv",
@@ -346,7 +346,7 @@ func TestPanelTemplate(t *testing.T) {
 	if strings.Contains(body, "<script>") || strings.Contains(body, "style=") || strings.Contains(body, "onclick") {
 		t.Error("panel zawiera skrypt lub styl inline (blokowane przez CSP)")
 	}
-	// Szablon nie wstawia danych filmów: tytuły trafiają do DOM tylko przez skrypt.
+	// The template does not insert video data: titles reach the DOM only through the script.
 	if strings.Contains(body, "jesienne") {
 		t.Error("panel nie powinien renderować danych po stronie serwera")
 	}

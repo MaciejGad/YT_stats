@@ -24,7 +24,7 @@ const (
 	apiQuotaBody = `{"error":{"code":403,"message":"The request cannot be completed because you have exceeded your quota.","errors":[{"reason":"quotaExceeded"}]}}`
 )
 
-// fakeYT symuluje trzy używane endpointy YouTube Data API.
+// fakeYT simulates the three YouTube Data API endpoints in use.
 type fakeYT struct {
 	t *testing.T
 
@@ -32,13 +32,13 @@ type fakeYT struct {
 	hiddenSubs      bool
 	noChannel       bool
 	noUploads       bool
-	playlist        []string          // ID w kolejności playlisty, mogą się powtarzać
+	playlist        []string          // IDs in playlist order, may repeat
 	playlistMissing bool              // 404 playlistNotFound
-	titles          map[string]string // filmy zwracane przez videos.list
+	titles          map[string]string // videos returned by videos.list
 	noViews         map[string]bool
-	reverseVideos   bool                                   // videos.list zwraca w odwrotnej kolejności
-	quotaKeys       map[string]bool                        // klucze z wyczerpanym limitem
-	fail            map[string]func(w http.ResponseWriter) // endpoint → odpowiedź błędu
+	reverseVideos   bool                                   // videos.list returns them in reverse order
+	quotaKeys       map[string]bool                        // keys with an exhausted quota
+	fail            map[string]func(w http.ResponseWriter) // endpoint → error response
 	delay           time.Duration
 	samePageToken   bool
 
@@ -178,7 +178,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
-// clock to kontrolowany zegar.
+// clock is a controlled clock.
 type clock struct {
 	mu sync.Mutex
 	t  time.Time
@@ -251,7 +251,7 @@ func assertNoSecrets(t *testing.T, s string) {
 	}
 }
 
-// --- kanał ---
+// --- channel ---
 
 func TestFetchChannelStats(t *testing.T) {
 	s := newSetup(t, 3, nil)
@@ -298,7 +298,7 @@ func TestChannelWithoutUploadsPlaylist(t *testing.T) {
 	}
 }
 
-// --- paginacja ---
+// --- pagination ---
 
 func TestPagination(t *testing.T) {
 	for _, tc := range []struct{ videos, pages int }{{1, 1}, {50, 1}, {51, 2}, {150, 3}} {
@@ -366,7 +366,7 @@ func TestRepeatedPageToken(t *testing.T) {
 	}
 }
 
-// --- grupowanie i kolejność ---
+// --- batching and order ---
 
 func TestBatching(t *testing.T) {
 	for _, tc := range []struct {
@@ -422,7 +422,7 @@ func TestDuplicatesRemoved(t *testing.T) {
 
 func TestMissingVideoSkipped(t *testing.T) {
 	s := newSetup(t, 3, nil)
-	delete(s.fake.titles, "vid00000001") // prywatny lub usunięty
+	delete(s.fake.titles, "vid00000001") // private or deleted
 	res, err := s.client.Fetch(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -452,7 +452,7 @@ func TestCounter(t *testing.T) {
 	}
 }
 
-// --- błędy ---
+// --- errors ---
 
 func TestRequestTimeout(t *testing.T) {
 	s := newSetup(t, 1, func(o *Options) { o.RequestTimeout = 50 * time.Millisecond })
@@ -599,7 +599,7 @@ func TestNewValidation(t *testing.T) {
 	}
 }
 
-// --- zapasowy klucz ---
+// --- fallback key ---
 
 func TestQuotaSwitchesToFallback(t *testing.T) {
 	s := newSetup(t, 3, nil)
@@ -611,7 +611,7 @@ func TestQuotaSwitchesToFallback(t *testing.T) {
 	if len(res.Videos) != 3 {
 		t.Errorf("filmów %d", len(res.Videos))
 	}
-	// channels: 1 próba kluczem głównym + 1 zapasowym; reszta od razu zapasowym.
+	// channels: 1 attempt with the primary key + 1 with the fallback; the rest go straight to the fallback.
 	if s.fake.count("channels") != 2 || s.fake.count("playlistItems") != 1 || s.fake.count("videos") != 1 {
 		t.Errorf("wywołania: %v", s.fake.calls)
 	}
@@ -628,7 +628,7 @@ func TestQuotaSwitchesToFallback(t *testing.T) {
 func TestQuotaMidFetchRetriesSameRequest(t *testing.T) {
 	s := newSetup(t, 3, nil)
 	s.fake.fail["videos"] = nil
-	// Limit kończy się dopiero przy videos.list.
+	// The quota runs out only at videos.list.
 	served := 0
 	s.fake.fail["videos"] = func(w http.ResponseWriter) {
 		served++
@@ -648,7 +648,7 @@ func TestQuotaMidFetchRetriesSameRequest(t *testing.T) {
 
 func TestFallbackStaysUntilPacificMidnight(t *testing.T) {
 	s := newSetup(t, 1, nil)
-	// 12:00 UTC = 04:00 PST, następna północ PST = 08:00 UTC kolejnego dnia.
+	// 12:00 UTC = 04:00 PST, the next PST midnight = 08:00 UTC the following day.
 	s.fake.quotaKeys[primaryKey] = true
 	if _, err := s.client.Fetch(context.Background()); err != nil {
 		t.Fatal(err)
@@ -678,15 +678,15 @@ func TestFallbackStaysUntilPacificMidnight(t *testing.T) {
 
 func TestNextQuotaReset(t *testing.T) {
 	cases := []struct{ in, want string }{
-		// zima (PST, UTC−8)
+		// winter (PST, UTC−8)
 		{"2026-11-23T12:00:00Z", "2026-11-24T08:00:00Z"},
 		{"2026-11-24T07:59:59Z", "2026-11-24T08:00:00Z"},
 		{"2026-11-24T08:00:00Z", "2026-11-25T08:00:00Z"},
-		// lato (PDT, UTC−7)
+		// summer (PDT, UTC−7)
 		{"2026-07-01T12:00:00Z", "2026-07-02T07:00:00Z"},
-		// dzień zmiany czasu na letni w USA: 8 marca 2026
+		// US switch to daylight saving time: 8 March 2026
 		{"2026-03-08T12:00:00Z", "2026-03-09T07:00:00Z"},
-		// dzień zmiany czasu na zimowy w USA: 1 listopada 2026
+		// US switch back to standard time: 1 November 2026
 		{"2026-11-01T12:00:00Z", "2026-11-02T08:00:00Z"},
 	}
 	for _, tc := range cases {
@@ -726,7 +726,7 @@ func TestQuotaOnBothKeys(t *testing.T) {
 		t.Errorf("oczekiwano 2 prób (główny + zapasowy), jest %d", s.fake.count("channels"))
 	}
 
-	// Kolejne pobranie od razu używa zapasowego i nie ponawia.
+	// The next fetch uses the fallback straight away and does not retry.
 	if _, err := s.client.Fetch(context.Background()); err == nil {
 		t.Fatal("oczekiwano błędu")
 	}

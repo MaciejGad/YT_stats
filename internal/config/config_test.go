@@ -40,7 +40,7 @@ func writeConfig(t *testing.T, v any, perm os.FileMode) string {
 	if err := os.WriteFile(path, data, perm); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(path, perm); err != nil { // omija umask
+	if err := os.Chmod(path, perm); err != nil { // bypasses umask
 		t.Fatal(err)
 	}
 	return path
@@ -214,7 +214,7 @@ func TestFallbackOptional(t *testing.T) {
 
 func TestErrorsNeverContainSecrets(t *testing.T) {
 	cfg := validConfig(t)
-	cfg.APIKeyFallback = testKey // ten sam klucz — błąd
+	cfg.APIKeyFallback = testKey // the same key — an error
 	cfg.PasswordHash = cfg.PasswordHash[:len(cfg.PasswordHash)-3] + "!!!"
 	err := cfg.Validate()
 	if err == nil {

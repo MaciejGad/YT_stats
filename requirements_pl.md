@@ -1,5 +1,7 @@
 # Wymagania — statystyki YouTube YarnPower
 
+[English](requirements.md) | **Polski**
+
 ## Cel i zakres
 
 Prywatny panel pod adresem `https://maciejgad.pl/yt/` pokazuje bieżące statystyki kanału [@YarnPowerPL](https://www.youtube.com/@YarnPowerPL). Zastępuje funkcje obecnych `index.php`, `stat.php`, `functions.php` i `script.js`. Zakres obejmuje logowanie, podsumowanie kanału i tabelę filmów. Historia CSV, wykresy, cron i okresowe odświeżanie w tle pozostają poza zakresem.

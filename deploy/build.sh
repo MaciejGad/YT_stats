@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Buduje paczkę wdrożeniową na Linuksa (uruchamiany na Macu).
+# Builds the Linux deployment package (run on the Mac).
 #
-#   deploy/build.sh [amd64|arm64]      domyślnie amd64 (uname -m = x86_64)
+#   deploy/build.sh [amd64|arm64]      default amd64 (uname -m = x86_64)
 #
-# Najpierw uruchamia testy, potem buduje statyczną binarkę i pakuje ją razem
-# z plikami interfejsu i skryptem instalacji do dist/yt-stats-<wersja>-linux-<arch>.tar.gz.
+# Runs the tests first, then builds a static binary and packs it together
+# with the interface files and the install script into dist/yt-stats-<version>-linux-<arch>.tar.gz.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -39,11 +39,11 @@ echo "Czas budowania: $(( $(date +%s) - start )) s (przyrostowo, z cache Go)"
 
 cp -R web "$OUT/web"
 cp -R deploy/nginx "$OUT/nginx"
-cp deploy/yt-stats.service deploy/install.sh deploy/config.server.example.json deploy/README.md "$OUT/"
+cp deploy/yt-stats.service deploy/install.sh deploy/config.server.example.json deploy/README.md deploy/README_pl.md "$OUT/"
 echo "$ARCH" > "$OUT/ARCH"
 echo "$VERSION" > "$OUT/VERSION"
 
-# Bez metadanych macOS (._*, xattr), żeby GNU tar na serwerze nie zgłaszał ostrzeżeń.
+# No macOS metadata (._*, xattr), so GNU tar on the server prints no warnings.
 COPYFILE_DISABLE=1 tar --no-mac-metadata --no-xattrs -C dist -czf "$OUT.tar.gz" "$NAME"
 rm -rf "$OUT"
 
