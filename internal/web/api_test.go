@@ -22,7 +22,18 @@ type fakeStats struct {
 	calls   atomic.Int32
 	payload *stats.Payload
 	err     error
+	channel *stats.Channel
+	logo    *stats.Logo
 }
+
+func (f *fakeStats) Channel() (stats.Channel, bool) {
+	if f.channel == nil {
+		return stats.Channel{}, false
+	}
+	return *f.channel, true
+}
+
+func (f *fakeStats) Logo() (*stats.Logo, bool) { return f.logo, f.logo != nil }
 
 func (f *fakeStats) Get(context.Context) (*stats.Payload, error) {
 	f.calls.Add(1)

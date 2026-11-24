@@ -9,10 +9,12 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -48,6 +50,8 @@ func testEnv(stdin string) (env, *syncBuffer, *syncBuffer) {
 		listen: func(string, string) (net.Listener, error) {
 			return nil, errors.New("listen nie powinien być wywołany")
 		},
+		// Port 1 refuses connections: tests never reach the real API.
+		youtubeURL: "http://127.0.0.1:1/youtube/v3/",
 	}, &out, &errOut
 }
 
@@ -337,6 +341,59 @@ func TestServeStartsAndStops(t *testing.T) {
 	}
 }
 
+func TestServeFetchesChannelAtStartup(t *testing.T) {
+	var channelCalls atomic.Int32
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/channels"):
+			channelCalls.Add(1)
+			// The avatar host is not allowed, so no image is fetched over the network.
+			w.Write([]byte(`{"items":[{"snippet":{"title":"Kanał z API","customUrl":"@zapi","thumbnails":{"medium":{"url":"https://example.invalid/a"}}},` +
+				`"statistics":{"viewCount":"1","subscriberCount":"2"},"contentDetails":{"relatedPlaylists":{"uploads":"UUx"}}}]}`))
+		case strings.HasSuffix(r.URL.Path, "/playlistItems"):
+			w.Write([]byte(`{"items":[]}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer api.Close()
+
+	path := writeValidConfig(t, "../../web")
+	e, _, errOut := testEnv("")
+	e.youtubeURL = api.URL + "/youtube/v3/"
+	lnc := make(chan net.Listener, 1)
+	e.listen = localListen(t, lnc)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan int, 1)
+	go func() { done <- run(ctx, []string{"-config", path}, e) }()
+	defer func() { cancel(); <-done }()
+
+	ln := <-lnc
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		resp, err := http.Get("http://" + ln.Addr().String() + "/yt/login")
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if strings.Contains(string(body), "<title>Logowanie — Kanał z API</title>") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("strona logowania bez nazwy kanału po 5 s:\n%s\nlogi:\n%s", body, errOut)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if n := channelCalls.Load(); n != 1 {
+		t.Errorf("channels.list przy starcie: %d wywołań, oczekiwano 1", n)
+	}
+	if !strings.Contains(errOut.String(), "logo kanału") {
+		t.Errorf("odrzucony adres logo powinien trafić do logu:\n%s", errOut)
+	}
+}
+
 func TestServeWaitsForActiveRequest(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -601,7 +658,7 @@ func TestServerConfigExampleShape(t *testing.T) {
 	}
 	want := map[string]string{
 		"listen":       "127.0.0.1:8091",
-		"channel_id":   "UC5711W83ebIxkC8bHjOKI7g",
+		"channel_id":   "", // filled in by whoever deploys it
 		"session_file": "/var/lib/yt-stats/sessions.json",
 		"web_dir":      "/opt/yt-stats/web",
 	}

@@ -70,7 +70,7 @@ func render(t *testing.T, f *Files, name string) string {
 		t.Fatal(err)
 	}
 	var b strings.Builder
-	if err := tmpl.Execute(&b, map[string]string{"Name": "YarnPower"}); err != nil {
+	if err := tmpl.Execute(&b, map[string]string{"Name": "Kanał"}); err != nil {
 		t.Fatal(err)
 	}
 	return b.String()
@@ -81,7 +81,7 @@ func TestLoadFilesOK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := render(t, f, "index.html"); got != "<p>panel YarnPower</p>" {
+	if got := render(t, f, "index.html"); got != "<p>panel Kanał</p>" {
 		t.Errorf("render = %q", got)
 	}
 	s, err := f.Static("script.js")
@@ -145,7 +145,7 @@ func TestTemplateReloadOnChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, dir, "index.html", "<p>nowy {{.Name}}</p>", time.Now())
-	if got := render(t, f, "index.html"); got != "<p>nowy YarnPower</p>" {
+	if got := render(t, f, "index.html"); got != "<p>nowy Kanał</p>" {
 		t.Errorf("po zmianie render = %q", got)
 	}
 }
@@ -158,7 +158,7 @@ func TestTemplateBrokenKeepsPrevious(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, dir, "index.html", "{{if}}", time.Now())
-	if got := render(t, f, "index.html"); got != "<p>panel YarnPower</p>" {
+	if got := render(t, f, "index.html"); got != "<p>panel Kanał</p>" {
 		t.Errorf("po błędnej zmianie render = %q, oczekiwano poprzedniej wersji", got)
 	}
 	if !strings.Contains(logs.String(), "index.html") {
@@ -183,7 +183,7 @@ func TestTemplateDeletedKeepsPrevious(t *testing.T) {
 	dir := setupDir(t)
 	f, _ := LoadFiles(dir, newLogger(io.Discard))
 	os.Remove(filepath.Join(dir, "index.html"))
-	if got := render(t, f, "index.html"); got != "<p>panel YarnPower</p>" {
+	if got := render(t, f, "index.html"); got != "<p>panel Kanał</p>" {
 		t.Errorf("po usunięciu pliku render = %q", got)
 	}
 }

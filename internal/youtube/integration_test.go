@@ -4,7 +4,7 @@
 //
 //	YT_API_KEY=... go test -tags integration -v -run Integration ./internal/youtube
 //
-// Optionally YT_CHANNEL_ID (defaults to the @YarnPowerPL channel).
+// Optionally YT_CHANNEL_ID and YT_CHANNEL_HANDLE (default: the @YarnPowerPL channel).
 // Uses a few units of the key's daily quota.
 package youtube
 
@@ -50,17 +50,24 @@ func TestIntegrationChannelIDMatchesHandle(t *testing.T) {
 			ID string `json:"id"`
 		} `json:"items"`
 	}
-	q := url.Values{"part": {"id"}, "forHandle": {integrationHandle}}
+	handle := integrationHandle
+	if os.Getenv("YT_CHANNEL_ID") != "" {
+		handle = os.Getenv("YT_CHANNEL_HANDLE")
+		if handle == "" {
+			t.Skip("przy własnym YT_CHANNEL_ID ustaw YT_CHANNEL_HANDLE, żeby sprawdzić zgodność")
+		}
+	}
+	q := url.Values{"part": {"id"}, "forHandle": {handle}}
 	if err := c.get(context.Background(), "channels", q, &resp); err != nil {
 		t.Fatal(err)
 	}
 	if len(resp.Items) != 1 {
-		t.Fatalf("forHandle=%s zwrócił %d kanałów", integrationHandle, len(resp.Items))
+		t.Fatalf("forHandle=%s zwrócił %d kanałów", handle, len(resp.Items))
 	}
 	if got := resp.Items[0].ID; got != c.channelID {
-		t.Errorf("ID kanału %s = %s, w konfiguracji %s", integrationHandle, got, c.channelID)
+		t.Errorf("ID kanału %s = %s, w konfiguracji %s", handle, got, c.channelID)
 	}
-	t.Logf("%s → %s", integrationHandle, resp.Items[0].ID)
+	t.Logf("%s → %s", handle, resp.Items[0].ID)
 }
 
 func TestIntegrationFetch(t *testing.T) {
@@ -78,6 +85,17 @@ func TestIntegrationFetch(t *testing.T) {
 
 	if res.ViewCount == nil {
 		t.Error("brak liczby wyświetleń kanału")
+	}
+	t.Logf("kanał: %q, handle %q, miniatura %s", res.Channel.Title, res.Channel.Handle, res.Channel.ThumbnailURL)
+	if res.Channel.Title == "" || res.Channel.ThumbnailURL == "" {
+		t.Errorf("brak nazwy lub miniatury kanału: %+v", res.Channel)
+	} else {
+		img, ctype, err := c.FetchImage(ctx, res.Channel.ThumbnailURL)
+		if err != nil {
+			t.Errorf("pobranie logo kanału: %v", err)
+		} else {
+			t.Logf("logo: %s, %d bajtów", ctype, len(img))
+		}
 	}
 	if len(res.Videos) == 0 {
 		t.Fatal("brak filmów")

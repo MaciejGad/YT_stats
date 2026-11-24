@@ -1,12 +1,14 @@
-// YarnPower statistics panel: fetches /yt/stat.json on load and when
+// YouTube channel statistics panel: fetches /yt/stat.json on load and when
 // "Odśwież" (Refresh) is clicked. Titles reach the DOM only through textContent,
-// and links are built only from video IDs.
+// and links are built only from video IDs and the channel's YouTube address.
 'use strict';
 
 (function (root) {
   const API_URL = '/yt/stat.json';
   const LOGIN_URL = '/yt/login';
   const WATCH_URL = 'https://www.youtube.com/watch?v=';
+  const YOUTUBE_PREFIX = 'https://www.youtube.com/';
+  const LOGO_URL = '/yt/channel-logo?v=';
   const UNAVAILABLE = 'Niedostępne';
 
   const numberFormat = new Intl.NumberFormat('pl-PL');
@@ -53,6 +55,16 @@
     return WATCH_URL + encodeURIComponent(String(id));
   }
 
+  /** The channel address, or null when it does not point at YouTube. */
+  function channelURL(url) {
+    return typeof url === 'string' && url.startsWith(YOUTUBE_PREFIX) ? url : null;
+  }
+
+  /** The avatar URL for a logo version, or null without one. */
+  function logoURL(version) {
+    return typeof version === 'string' && /^[0-9a-f]+$/.test(version) ? LOGO_URL + version : null;
+  }
+
   /** Views as a percentage of the most popular video (0–100). */
   function shareOf(value, max) {
     const n = countValue(value);
@@ -61,7 +73,7 @@
   }
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { formatCount, formatTime, sortVideos, videoURL, shareOf };
+    module.exports = { formatCount, formatTime, sortVideos, videoURL, shareOf, channelURL, logoURL };
     return;
   }
 
@@ -83,6 +95,10 @@
     rows: $('video-rows'),
     empty: $('empty'),
     sortButtons: doc.querySelectorAll('[data-sort]'),
+    channelLogo: $('channel-logo'),
+    channelTitle: $('channel-title'),
+    channelSub: $('channel-sub'),
+    channelLink: $('channel-link'),
   };
 
   let data = null;
@@ -155,7 +171,26 @@
     els.empty.hidden = videos.length > 0;
   }
 
+  /** Fills in the header when the page was rendered before the channel was known. */
+  function renderChannel(ch) {
+    if (!ch || typeof ch.title !== 'string' || ch.title === '') return;
+    els.channelTitle.textContent = ch.title;
+    doc.title = ch.title + ' — statystyki';
+    const url = channelURL(ch.url);
+    if (url) {
+      els.channelLink.href = url;
+      els.channelLink.textContent = typeof ch.handle === 'string' && ch.handle !== '' ? ch.handle : 'Kanał';
+      els.channelSub.hidden = false;
+    }
+    const logo = logoURL(ch.logoVersion);
+    if (logo && els.channelLogo.getAttribute('src') !== logo) {
+      els.channelLogo.src = logo;
+      els.channelLogo.classList.add('is-avatar');
+    }
+  }
+
   function render() {
+    renderChannel(data.channel);
     setCount(els.subscribers, data.stats && data.stats.subscriberCount);
     setCount(els.views, data.stats && data.stats.viewsCount);
     els.videoCount.textContent = numberFormat.format((data.videos || []).length);

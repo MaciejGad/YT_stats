@@ -4,7 +4,7 @@
 
 ## Cel i zakres
 
-Prywatny panel pod adresem `https://maciejgad.pl/yt/` pokazuje bieżące statystyki kanału [@YarnPowerPL](https://www.youtube.com/@YarnPowerPL). Zastępuje funkcje obecnych `index.php`, `stat.php`, `functions.php` i `script.js`. Zakres obejmuje logowanie, podsumowanie kanału i tabelę filmów. Historia CSV, wykresy, cron i okresowe odświeżanie w tle pozostają poza zakresem.
+Prywatny panel pod adresem `https://maciejgad.pl/yt/` pokazuje bieżące statystyki kanału [@YarnPowerPL](https://www.youtube.com/@YarnPowerPL). Kanał wskazuje konfiguracja, więc ten sam panel może wdrożyć ktoś inny dla własnego kanału. Zastępuje funkcje obecnych `index.php`, `stat.php`, `functions.php` i `script.js`. Zakres obejmuje logowanie, podsumowanie kanału i tabelę filmów. Historia CSV, wykresy, cron i okresowe odświeżanie w tle pozostają poza zakresem.
 
 Katalog `old_implementation/` zawiera kopię starej wersji wyłącznie do podglądu. Jest wykluczony z repozytorium przez `.gitignore`.
 
@@ -21,9 +21,9 @@ Katalog `old_implementation/` zawiera kopię starej wersji wyłącznie do podgl�
 
 - Interfejs jest odnowiony i wyraźnie nowocześniejszy niż obecna strona. Cały tekst jest po polsku, dokument ma `lang="pl"`.
 - Strona działa bez poziomego przewijania na szerokościach od 360 px. Sprawdzamy ją na 375 px (telefon), 768 px (tablet) i 1280 px (komputer) oraz na prawdziwym telefonie.
-- Kolejność od góry: nagłówek z logo YarnPower i przyciskiem „Wyloguj”, lista filmów, a pod nią mniejszy panel podsumowania.
+- Kolejność od góry: nagłówek z awatarem i nazwą kanału oraz przyciskiem „Wyloguj”, lista filmów, a pod nią mniejszy panel podsumowania.
 - Panel podsumowania pokazuje subskrybentów, wyświetlenia kanału, liczbę filmów na liście, czas pobrania i przycisk „Odśwież”. Jest przyklejony do dołu ekranu (nie przewija się z listą), a na końcu strony zajmuje swoje miejsce pod listą.
-- Kolorystyka nawiązuje do logo i włóczki: granat logo, żółć kłębka i ciepłe, wełniane tło. Logo ma przezroczyste tło i wygląda dobrze w obu motywach.
+- Kolorystyka nawiązuje do włóczki: granat, żółć kłębka i ciepłe, wełniane tło. Awatar kanału jest pokazywany w kole i wygląda dobrze w obu motywach.
 - Od 768 px lista filmów jest tabelą z kolumnami „Tytuł” i „Wyświetlenia”; liczby są wyrównane do prawej cyframi o stałej szerokości. Poniżej 768 px każdy film jest wierszem-kartą z tytułem i liczbą wyświetleń pod nim.
 - Domyślna kolejność to kolejność playlisty przesłanych filmów (najnowsze na górze). Użytkownik może przełączyć sortowanie po liczbie wyświetleń malejąco. Sortowanie działa w przeglądarce i nie wysyła nowego żądania.
 - Liczby są formatowane w przeglądarce według `pl-PL` (np. `12 345`). JSON pozostaje ciągiem cyfr.
@@ -63,7 +63,10 @@ Katalog `old_implementation/` zawiera kopię starej wersji wyłącznie do podgl�
 
 ## Pobieranie danych
 
-- Identyfikator kanału to `UC5711W83ebIxkC8bHjOKI7g` (stara wersja doklejała `UC` w `functions.php`). Przed wdrożeniem potwierdzamy go zapytaniem `channels.list?forHandle=@YarnPowerPL`.
+- Identyfikator kanału pochodzi z konfiguracji (`channel_id`), więc panel może wdrożyć każdy dla własnego kanału. Dla @YarnPowerPL to `UC5711W83ebIxkC8bHjOKI7g` (stara wersja doklejała `UC` w `functions.php`). Przed wdrożeniem potwierdzamy go zapytaniem `channels.list?forHandle=@handle`.
+- Nazwa, handle (`customUrl`) i awatar kanału pochodzą z tego samego zapytania `channels.list` (`part=snippet`), więc nie zużywają dodatkowego limitu. Pokazują je nagłówek panelu i strona logowania; do pierwszego udanego pobrania widać ogólny tytuł i dołączone `logo.png`.
+- Awatar pobiera serwer (tylko po HTTPS z hostów obrazków Google `ggpht.com`, `googleusercontent.com`, `ytimg.com`, do 1 MiB, JPEG/PNG/WebP/GIF rozpoznane po zawartości, bez klucza API) i podaje go pod `/yt/channel-logo`, więc strona nadal nie ładuje niczego z zewnętrznych serwerów. Awatar jest pobierany ponownie tylko po zmianie jego adresu. Nieudane pobranie awatara nie przerywa odświeżenia.
+- Zaraz po starcie aplikacja raz pobiera dane, żeby strona logowania znała nazwę i awatar kanału. Potem, jak dotąd, YouTube jest odpytywany tylko po autoryzowanym żądaniu.
 - Go odpytuje YouTube Data API v3 po autoryzowanym żądaniu, jeśli ostatni udany odczyt jest starszy niż 60 sekund. Równoległe odświeżenia współdzielą jedno pobranie.
 - Aplikacja odczytuje statystyki kanału oraz identyfikator playlisty przesłanych filmów. Obsługuje wszystkie strony playlisty (stara wersja pobierała tylko pierwsze 50 filmów) i pobiera statystyki filmów grupami po 50. Prywatne i usunięte filmy pomija, jeśli API nie udostępnia ich szczegółów.
 - Po błędzie aplikacja zwraca ostatni udany wynik z maksymalnie 24 godzin, z kodem `200` i `stale: true`. Przez 30 sekund od błędu kolejne żądania korzystają z tego samego stanu zamiast natychmiast ponawiać zapytania do YouTube. Brak wyniku w tym oknie oznacza odpowiedź `503`.
@@ -87,9 +90,10 @@ Katalog `old_implementation/` zawiera kopię starej wersji wyłącznie do podgl�
 | `POST /yt/logout` | Unieważnienie sesji i `303` do `/yt/login`. |
 | `GET /yt/stat.json` | Statystyki lub `401` przy braku ważnej sesji. |
 | `GET /yt/script.js`, `GET /yt/style.css`, `GET /yt/logo.png`, `GET /yt/favicon.png` | Pliki statyczne, dostępne bez sesji. |
+| `GET /yt/channel-logo` | Awatar kanału, dostępny bez sesji (pokazuje go strona logowania); `404` do czasu pobrania. Wersjonowany jak pliki statyczne. |
 
 - Każda trasa `GET` obsługuje też `HEAD`. Inna metoda na znanej ścieżce zwraca `405` z nagłówkiem `Allow`. Nieznana ścieżka zwraca `404`.
-- JSON zachowuje dotychczasowe pola `stats.subscriberCount`, `stats.viewsCount`, `videos[].videoId`, `videos[].title`, `videos[].viewCount` i `update_time`. Liczniki pozostają ciągami cyfr. Brak licznika reprezentuje `null`. Pole `stale` informuje, czy wynik pochodzi z odczytu awaryjnego.
+- JSON zachowuje dotychczasowe pola `stats.subscriberCount`, `stats.viewsCount`, `videos[].videoId`, `videos[].title`, `videos[].viewCount` i `update_time`. Liczniki pozostają ciągami cyfr. Brak licznika reprezentuje `null`. Pole `stale` informuje, czy wynik pochodzi z odczytu awaryjnego. Pole `channel` zawiera `title`, `handle` (może go nie być), `url` i `logoVersion` (brak bez awatara).
 - `update_time` ma format ISO 8601 z przesunięciem strefy `Europe/Warsaw`, np. `2026-11-23T22:45:10+01:00`. Przeglądarka wyświetla go w strefie `Europe/Warsaw` niezależnie od strefy urządzenia.
 - Przy błędzie endpoint zwraca `{"error": "<krótki komunikat>"}` bez szczegółów wewnętrznych. Skrypt po `401` przekierowuje do formularza logowania.
 - Wszystkie odpowiedzi mają nagłówki: `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`. HSTS ustawia Nginx.

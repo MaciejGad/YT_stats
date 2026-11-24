@@ -48,7 +48,7 @@ The first run creates the `yt-stats` user, copies the files and creates `/etc/yt
 sudo nano /etc/yt-stats/config.json
 ```
 
-Enter `api_key` (optionally `api_key_fallback`), `username`, and the output of `hash-password` as `password_hash`. Then again:
+Enter `channel_id` (the `UC…` ID of your channel), `api_key` (optionally `api_key_fallback`), `username`, and the output of `hash-password` as `password_hash`. Then again:
 
 ```bash
 sudo ./install.sh

@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>YarnPower — statystyki</title>
-<link rel="icon" href="{{asset "favicon.png"}}" type="image/png">
-<link rel="apple-touch-icon" href="{{asset "logo.png"}}">
+<title>{{if .Channel.Known}}{{.Channel.Title}} — statystyki{{else}}{{.Channel.Title}}{{end}}</title>
+<link rel="icon" href="{{with .Channel.LogoURL}}{{.}}{{else}}{{asset "favicon.png"}}{{end}}">
+<link rel="apple-touch-icon" href="{{with .Channel.LogoURL}}{{.}}{{else}}{{asset "logo.png"}}{{end}}">
 <link rel="stylesheet" href="{{asset "style.css"}}">
 </head>
 <body>
 <div class="page">
   <header class="topbar">
     <div class="brand">
-      <img class="brand-logo" src="{{asset "logo.png"}}" alt="YarnPower" width="80" height="74">
+      <img id="channel-logo" class="brand-logo{{if .Channel.LogoURL}} is-avatar{{end}}" src="{{with .Channel.LogoURL}}{{.}}{{else}}{{asset "logo.png"}}{{end}}" alt="" width="80" height="80">
       <div class="brand-text">
-        <h1 class="brand-name">Statystyki kanału</h1>
-        <p class="brand-sub"><a href="https://www.youtube.com/@YarnPowerPL" target="_blank" rel="noopener noreferrer">@YarnPowerPL</a> na YouTube</p>
+        <h1 id="channel-title" class="brand-name">{{.Channel.Title}}</h1>
+        <p id="channel-sub" class="brand-sub"{{if not .Channel.Known}} hidden{{end}}><a id="channel-link" href="{{.Channel.URL}}" target="_blank" rel="noopener noreferrer">{{if .Channel.Handle}}{{.Channel.Handle}}{{else}}Kanał{{end}}</a> na YouTube</p>
       </div>
     </div>
     <form method="post" action="/yt/logout">

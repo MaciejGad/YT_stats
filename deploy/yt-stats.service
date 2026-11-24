@@ -1,7 +1,7 @@
-# YarnPower statistics panel service.
+# YouTube channel statistics panel service.
 # Installation: deploy/install.sh (copies the file to /etc/systemd/system/).
 [Unit]
-Description=YarnPower - panel statystyk YouTube
+Description=yt-stats - panel statystyk kanału YouTube
 Documentation=file:///opt/yt-stats/README.md
 After=network-online.target
 Wants=network-online.target

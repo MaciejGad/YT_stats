@@ -4,8 +4,11 @@ package stats
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"log/slog"
+	"net/url"
 	"sync"
 	"time"
 
@@ -40,12 +43,34 @@ type Fetcher interface {
 	Fetch(ctx context.Context) (*youtube.Result, error)
 }
 
+// ImageFetcher downloads the channel avatar. *youtube.Client implements it.
+type ImageFetcher interface {
+	FetchImage(ctx context.Context, url string) ([]byte, string, error)
+}
+
 // Payload is the /yt/stat.json response.
 type Payload struct {
+	Channel    Channel `json:"channel"`
 	Stats      Stats   `json:"stats"`
 	Videos     []Video `json:"videos"`
 	UpdateTime string  `json:"update_time"`
 	Stale      bool    `json:"stale"`
+}
+
+// Channel is the channel's name and links shown in the panel header.
+type Channel struct {
+	Title       string `json:"title"`
+	Handle      string `json:"handle,omitempty"`
+	URL         string `json:"url"`
+	LogoVersion string `json:"logoVersion,omitempty"` // empty when there is no avatar
+}
+
+// Logo is the downloaded channel avatar.
+type Logo struct {
+	Data        []byte
+	ContentType string
+	Version     string // content hash, used in the URL to bust caches
+	ModTime     time.Time
 }
 
 // Stats holds the channel counters.
@@ -67,6 +92,7 @@ type Options struct {
 	MaxStaleAge    time.Duration
 	ErrorBackoff   time.Duration
 	RefreshTimeout time.Duration
+	Images         ImageFetcher // nil: no avatar
 	Now            func() time.Time
 	Log            *slog.Logger
 }
@@ -91,6 +117,8 @@ type Cache struct {
 	last      *snapshot
 	lastErrAt time.Time // zero when the last fetch succeeded
 	inflight  *call
+	logo      *Logo
+	logoSrc   string // thumbnail URL the logo was downloaded from
 }
 
 // New creates an empty cache.
@@ -168,6 +196,9 @@ func (c *Cache) refresh(cl *call) {
 	if err == nil && res == nil {
 		err = errors.New("pobranie zwróciło pusty wynik")
 	}
+	if err == nil {
+		c.updateLogo(ctx, res.Channel.ThumbnailURL)
+	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -176,13 +207,60 @@ func (c *Cache) refresh(cl *call) {
 		c.lastErrAt = now
 		c.opt.Log.Warn("odświeżenie statystyk nie powiodło się", "err", err, "duration", now.Sub(start).Round(time.Millisecond))
 	} else {
-		c.last = &snapshot{payload: toPayload(res, now), fetchedAt: now}
+		p := toPayload(res, now)
+		if c.logo != nil {
+			p.Channel.LogoVersion = c.logo.Version
+		}
+		c.last = &snapshot{payload: p, fetchedAt: now}
 		c.lastErrAt = time.Time{}
 		c.opt.Log.Info("pobrano statystyki", "videos", len(res.Videos), "duration", now.Sub(start).Round(time.Millisecond))
 	}
 	cl.err = err
 	c.inflight = nil
 	close(cl.done)
+}
+
+// updateLogo downloads the avatar when its URL changed or it is still missing.
+// A failed download keeps the previous avatar and does not fail the refresh.
+func (c *Cache) updateLogo(ctx context.Context, src string) {
+	if c.opt.Images == nil || src == "" {
+		return
+	}
+	c.mu.Lock()
+	same := c.logo != nil && c.logoSrc == src
+	c.mu.Unlock()
+	if same {
+		return
+	}
+	data, ctype, err := c.opt.Images.FetchImage(ctx, src)
+	if err != nil {
+		c.opt.Log.Warn("nie udało się pobrać logo kanału", "err", err)
+		return
+	}
+	sum := sha256.Sum256(data)
+	logo := &Logo{Data: data, ContentType: ctype, Version: hex.EncodeToString(sum[:8]), ModTime: c.opt.Now()}
+	c.mu.Lock()
+	c.logo, c.logoSrc = logo, src
+	c.mu.Unlock()
+	c.opt.Log.Info("pobrano logo kanału", "type", ctype, "bytes", len(data))
+}
+
+// Channel returns the channel from the last successful fetch, however old,
+// without fetching. ok is false before the first successful fetch.
+func (c *Cache) Channel() (ch Channel, ok bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.last == nil {
+		return Channel{}, false
+	}
+	return c.last.payload.Channel, true
+}
+
+// Logo returns the channel avatar, if one has been downloaded.
+func (c *Cache) Logo() (*Logo, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.logo, c.logo != nil
 }
 
 func (c *Cache) fallbackLocked(now time.Time) (*Payload, error) {
@@ -200,10 +278,19 @@ func toPayload(r *youtube.Result, at time.Time) Payload {
 		videos[i] = Video{VideoID: v.ID, Title: v.Title, ViewCount: v.ViewCount}
 	}
 	return Payload{
+		Channel:    channelOf(r.Channel),
 		Stats:      Stats{SubscriberCount: r.SubscriberCount, ViewsCount: r.ViewCount},
 		Videos:     videos,
 		UpdateTime: FormatTime(at),
 	}
+}
+
+func channelOf(ch youtube.Channel) Channel {
+	out := Channel{Title: ch.Title, Handle: ch.Handle, URL: "https://www.youtube.com/channel/" + url.PathEscape(ch.ID)}
+	if ch.Handle != "" {
+		out.URL = "https://www.youtube.com/" + url.PathEscape(ch.Handle)
+	}
+	return out
 }
 
 // FormatTime returns the time in ISO 8601 with the Europe/Warsaw offset.

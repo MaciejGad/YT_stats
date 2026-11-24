@@ -30,6 +30,7 @@ const (
 	pathPanel  = "/yt/"
 	pathLogin  = "/yt/login"
 	pathLogout = "/yt/logout"
+	pathLogo   = "/yt/channel-logo"
 )
 
 // Deps are the handler's dependencies.
@@ -43,9 +44,12 @@ type Deps struct {
 	Stats    StatsSource
 }
 
-// StatsSource provides the data for /yt/stat.json. *stats.Cache implements it.
+// StatsSource provides the data for /yt/stat.json and the channel's name and
+// avatar for the page header. *stats.Cache implements it.
 type StatsSource interface {
 	Get(ctx context.Context) (*stats.Payload, error)
+	Channel() (stats.Channel, bool)
+	Logo() (*stats.Logo, bool)
 }
 
 type server struct {
@@ -62,6 +66,7 @@ func NewHandler(d Deps) http.Handler {
 	mux.HandleFunc("POST /yt/login", s.handleLogin)
 	mux.HandleFunc("POST /yt/logout", s.handleLogout)
 	mux.HandleFunc("GET /yt/stat.json", s.handleStats)
+	mux.HandleFunc("GET "+pathLogo, s.handleLogo)
 	for _, name := range StaticNames {
 		mux.HandleFunc("GET /yt/"+name, s.handleStatic(name))
 	}
@@ -71,13 +76,42 @@ func NewHandler(d Deps) http.Handler {
 // --- template data ---
 
 type loginData struct {
-	CSRF  string
-	Error string
+	Channel channelView
+	CSRF    string
+	Error   string
 }
 
 type panelData struct {
+	Channel    channelView
 	LogoutCSRF string
 	Error      string
+}
+
+// channelView is the channel as shown in the page header. Before the first
+// successful fetch only the defaults are known; the script fills in the rest.
+type channelView struct {
+	Title   string // channel name, or a generic title
+	Known   bool   // false before the first successful fetch
+	Handle  string
+	URL     string
+	LogoURL string // versioned avatar URL; empty: use the bundled logo.png
+}
+
+const defaultTitle = "Statystyki kanału YouTube"
+
+func (s *server) channelView() channelView {
+	v := channelView{Title: defaultTitle}
+	if ch, ok := s.Stats.Channel(); ok && ch.Title != "" {
+		v = channelView{Title: ch.Title, Known: true, Handle: ch.Handle, URL: ch.URL}
+	}
+	if logo, ok := s.Stats.Logo(); ok {
+		v.LogoURL = pathLogo + "?v=" + logo.Version
+	}
+	return v
+}
+
+func (s *server) panel(token, msg string) panelData {
+	return panelData{Channel: s.channelView(), LogoutCSRF: auth.LogoutToken(token), Error: msg}
 }
 
 // --- panel ---
@@ -88,7 +122,7 @@ func (s *server) handlePanel(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, pathLogin, http.StatusSeeOther)
 		return
 	}
-	s.render(w, http.StatusOK, "index.html", panelData{LogoutCSRF: auth.LogoutToken(token)})
+	s.render(w, http.StatusOK, "index.html", s.panel(token, ""))
 }
 
 // --- login ---
@@ -167,18 +201,12 @@ func (s *server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	if !auth.CheckLogoutToken(token, r.PostFormValue("csrf")) {
 		s.Log.Warn("odrzucono wylogowanie: niepoprawny token CSRF", "ip", clientIP(r))
-		s.render(w, http.StatusForbidden, "index.html", panelData{
-			LogoutCSRF: auth.LogoutToken(token),
-			Error:      "Nie udało się potwierdzić wylogowania. Spróbuj ponownie.",
-		})
+		s.render(w, http.StatusForbidden, "index.html", s.panel(token, "Nie udało się potwierdzić wylogowania. Spróbuj ponownie."))
 		return
 	}
 	if err := s.Sessions.Delete(token); err != nil {
 		s.Log.Error("nie udało się zapisać wylogowania", "err", err)
-		s.render(w, http.StatusInternalServerError, "index.html", panelData{
-			LogoutCSRF: auth.LogoutToken(token),
-			Error:      "Nie udało się wylogować. Spróbuj ponownie.",
-		})
+		s.render(w, http.StatusInternalServerError, "index.html", s.panel(token, "Nie udało się wylogować. Spróbuj ponownie."))
 		return
 	}
 	clearCookie(w, SessionCookie)
@@ -235,7 +263,7 @@ func (s *server) renderLogin(w http.ResponseWriter, r *http.Request, status int,
 			SameSite: http.SameSiteLaxMode,
 		})
 	}
-	s.render(w, status, "login.html", loginData{CSRF: csrf, Error: msg})
+	s.render(w, status, "login.html", loginData{Channel: s.channelView(), CSRF: csrf, Error: msg})
 }
 
 // render executes the template into a buffer, so a template error gives a clean 500.

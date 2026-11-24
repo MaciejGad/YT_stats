@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,6 +42,7 @@ type fakeYT struct {
 	fail            map[string]func(w http.ResponseWriter) // endpoint → error response
 	delay           time.Duration
 	samePageToken   bool
+	snippet         map[string]any // channels.list snippet; nil gives the default
 
 	calls      map[string]int
 	keysUsed   []string
@@ -112,7 +114,20 @@ func (f *fakeYT) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if f.noUploads {
 			uploads = ""
 		}
+		snippet := f.snippet
+		if snippet == nil {
+			snippet = map[string]any{
+				"title":     "Kanał testowy",
+				"customUrl": "@kanaltestowy",
+				"thumbnails": map[string]any{
+					"default": map[string]any{"url": "https://yt3.ggpht.com/a=s88"},
+					"medium":  map[string]any{"url": "https://yt3.ggpht.com/a=s240"},
+					"high":    map[string]any{"url": "https://yt3.ggpht.com/a=s800"},
+				},
+			}
+		}
 		writeJSON(w, map[string]any{"items": []any{map[string]any{
+			"snippet":        snippet,
 			"statistics":     stats,
 			"contentDetails": map[string]any{"relatedPlaylists": map[string]any{"uploads": uploads}},
 		}}})
@@ -264,6 +279,65 @@ func TestFetchChannelStats(t *testing.T) {
 	}
 	if len(res.Videos) != 3 || res.Videos[0].ID != "vid00000000" || res.Videos[0].Title != "Film 0" {
 		t.Errorf("filmy: %+v", res.Videos)
+	}
+}
+
+func TestFetchChannelSnippet(t *testing.T) {
+	s := newSetup(t, 1, nil)
+	res, err := s.client.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Channel{ID: testChannel, Title: "Kanał testowy", Handle: "@kanaltestowy", ThumbnailURL: "https://yt3.ggpht.com/a=s240"}
+	if res.Channel != want {
+		t.Errorf("kanał:\n got %+v\nwant %+v", res.Channel, want)
+	}
+}
+
+func TestChannelSnippetFallbacks(t *testing.T) {
+	cases := []struct {
+		name    string
+		snippet map[string]any
+		want    Channel
+	}{
+		{"tylko mała miniatura", map[string]any{"title": " Nazwa ", "thumbnails": map[string]any{"default": map[string]any{"url": "https://yt3.ggpht.com/x"}}},
+			Channel{ID: testChannel, Title: "Nazwa", ThumbnailURL: "https://yt3.ggpht.com/x"}},
+		{"brak miniatur i handle", map[string]any{"title": "Nazwa"}, Channel{ID: testChannel, Title: "Nazwa"}},
+		{"handle bez @", map[string]any{"title": "N", "customUrl": "nazwa"}, Channel{ID: testChannel, Title: "N"}},
+		{"handle ze ścieżką", map[string]any{"title": "N", "customUrl": "@a/../b"}, Channel{ID: testChannel, Title: "N"}},
+		{"handle z polskimi znakami", map[string]any{"title": "N", "customUrl": "@włóczka.pl"}, Channel{ID: testChannel, Title: "N", Handle: "@włóczka.pl"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newSetup(t, 1, nil)
+			s.fake.snippet = tc.snippet
+			res, err := s.client.Fetch(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Channel != tc.want {
+				t.Errorf("got %+v, want %+v", res.Channel, tc.want)
+			}
+		})
+	}
+}
+
+func TestChannelRequestAsksForSnippet(t *testing.T) {
+	var got url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/channels") {
+			got = r.URL.Query()
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c, err := New(Options{ChannelID: testChannel, APIKey: primaryKey, BaseURL: srv.URL + "/youtube/v3/", HTTPClient: srv.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Fetch(context.Background())
+	if !strings.Contains(got.Get("part"), "snippet") || !strings.Contains(got.Get("fields"), "snippet(title,customUrl,thumbnails)") {
+		t.Errorf("zapytanie channels.list: part=%q fields=%q", got.Get("part"), got.Get("fields"))
 	}
 }
 

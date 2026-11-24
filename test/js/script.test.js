@@ -2,7 +2,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { formatCount, formatTime, sortVideos, videoURL, shareOf } = require('../../web/script.js');
+const { formatCount, formatTime, sortVideos, videoURL, shareOf, channelURL, logoURL } = require('../../web/script.js');
 
 // Intl in pl-PL uses a no-break space as the thousands separator.
 const nb = (s) => s.replace(/[  ]/g, ' ');
@@ -74,4 +74,20 @@ test('shareOf liczy udział względem najpopularniejszego filmu', () => {
   assert.equal(shareOf('0', 5000), 0);
   assert.equal(shareOf(null, 5000), 0);
   assert.equal(shareOf('10', 0), 0);
+});
+
+test('channelURL przepuszcza tylko adresy YouTube', () => {
+  assert.equal(channelURL('https://www.youtube.com/@kanal'), 'https://www.youtube.com/@kanal');
+  assert.equal(channelURL('https://www.youtube.com/channel/UCabc'), 'https://www.youtube.com/channel/UCabc');
+  assert.equal(channelURL('javascript:alert(1)'), null);
+  assert.equal(channelURL('https://www.youtube.com.evil.example/'), null);
+  assert.equal(channelURL('http://www.youtube.com/@kanal'), null);
+  assert.equal(channelURL(undefined), null);
+});
+
+test('logoURL buduje adres tylko z wersji szesnastkowej', () => {
+  assert.equal(logoURL('0123abcdef456789'), '/yt/channel-logo?v=0123abcdef456789');
+  assert.equal(logoURL(''), null);
+  assert.equal(logoURL('abc"><x'), null);
+  assert.equal(logoURL(undefined), null);
 });

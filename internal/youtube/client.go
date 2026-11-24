@@ -34,9 +34,18 @@ var ErrTooManyPages = errors.New("YouTube API: przekroczono limit stron playlist
 // Result is the result of one complete fetch. Counters are digit strings
 // or nil when the API does not provide them.
 type Result struct {
+	Channel         Channel
 	SubscriberCount *string
 	ViewCount       *string
 	Videos          []Video
+}
+
+// Channel describes the channel: its name, handle and avatar.
+type Channel struct {
+	ID           string
+	Title        string
+	Handle       string // e.g. @yarnpowerpl; empty when the channel has none
+	ThumbnailURL string // avatar on a Google image host; empty when missing
 }
 
 // Video is a video from the uploads playlist.
@@ -57,6 +66,8 @@ type Options struct {
 	RequestTimeout   time.Duration
 	MaxResponseBytes int64
 	MaxPages         int
+	MaxImageBytes    int64
+	ImageHosts       []string // hosts allowed for FetchImage; default DefaultImageHosts
 	Now              func() time.Time
 	Log              *slog.Logger
 }
@@ -69,6 +80,8 @@ type Client struct {
 	reqTimeout  time.Duration
 	maxBytes    int64
 	maxPages    int
+	maxImage    int64
+	imageHosts  []string
 	keys        *keyring
 	log         *slog.Logger
 	secretWords []string
@@ -98,6 +111,12 @@ func New(o Options) (*Client, error) {
 	if o.MaxPages == 0 {
 		o.MaxPages = DefaultMaxPages
 	}
+	if o.MaxImageBytes == 0 {
+		o.MaxImageBytes = DefaultMaxImageBytes
+	}
+	if o.ImageHosts == nil {
+		o.ImageHosts = DefaultImageHosts
+	}
 	if o.Now == nil {
 		o.Now = time.Now
 	}
@@ -115,6 +134,8 @@ func New(o Options) (*Client, error) {
 		reqTimeout:  o.RequestTimeout,
 		maxBytes:    o.MaxResponseBytes,
 		maxPages:    o.MaxPages,
+		maxImage:    o.MaxImageBytes,
+		imageHosts:  o.ImageHosts,
 		keys:        newKeyring(o.APIKey, o.APIKeyFallback, o.Now, o.Log),
 		log:         o.Log,
 		secretWords: secrets,
@@ -144,10 +165,11 @@ func (c *Client) fetch(ctx context.Context) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Result{SubscriberCount: ch.subscribers, ViewCount: ch.views, Videos: videos}, nil
+	return &Result{Channel: ch.Channel, SubscriberCount: ch.subscribers, ViewCount: ch.views, Videos: videos}, nil
 }
 
 type channelInfo struct {
+	Channel
 	subscribers *string
 	views       *string
 	uploads     string
@@ -156,6 +178,13 @@ type channelInfo struct {
 func (c *Client) channel(ctx context.Context) (*channelInfo, error) {
 	var resp struct {
 		Items []struct {
+			Snippet struct {
+				Title      string `json:"title"`
+				CustomURL  string `json:"customUrl"`
+				Thumbnails map[string]struct {
+					URL string `json:"url"`
+				} `json:"thumbnails"`
+			} `json:"snippet"`
 			Statistics struct {
 				ViewCount             string `json:"viewCount"`
 				SubscriberCount       string `json:"subscriberCount"`
@@ -169,9 +198,9 @@ func (c *Client) channel(ctx context.Context) (*channelInfo, error) {
 		} `json:"items"`
 	}
 	q := url.Values{
-		"part":   {"statistics,contentDetails"},
+		"part":   {"snippet,statistics,contentDetails"},
 		"id":     {c.channelID},
-		"fields": {"items(statistics(viewCount,subscriberCount,hiddenSubscriberCount),contentDetails/relatedPlaylists/uploads)"},
+		"fields": {"items(snippet(title,customUrl,thumbnails),statistics(viewCount,subscriberCount,hiddenSubscriberCount),contentDetails/relatedPlaylists/uploads)"},
 	}
 	if err := c.get(ctx, "channels", q, &resp); err != nil {
 		return nil, err
@@ -184,6 +213,12 @@ func (c *Client) channel(ctx context.Context) (*channelInfo, error) {
 		return nil, errors.New("YouTube API: kanał nie ma playlisty przesłanych filmów")
 	}
 	info := &channelInfo{
+		Channel: Channel{
+			ID:           c.channelID,
+			Title:        strings.TrimSpace(it.Snippet.Title),
+			Handle:       validHandle(it.Snippet.CustomURL),
+			ThumbnailURL: pickThumbnail(it.Snippet.Thumbnails),
+		},
 		views:   counter(it.Statistics.ViewCount),
 		uploads: it.ContentDetails.RelatedPlaylists.Uploads,
 	}

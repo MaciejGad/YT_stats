@@ -1,5 +1,5 @@
-/* YarnPower — statistics panel. Colours from the logo: navy, the yellow of
-   the ball of yarn, the blue of the needles; a background like natural wool.
+/* YouTube channel statistics panel. Yarn-inspired colours: navy, the yellow
+   of a ball of yarn, the blue of the needles; a background like natural wool.
    No external resources (CSP: default-src 'self'). */
 
 :root {
@@ -122,6 +122,7 @@ h1, h2, p, dl, dd { margin: 0; }
 
 .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .brand-logo { flex: none; width: 80px; height: auto; }
+.is-avatar { aspect-ratio: 1; height: auto; border-radius: 50%; object-fit: cover; }
 .brand-text { min-width: 0; }
 .brand-name { font-size: 1.375rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; }
 .brand-sub { color: var(--muted); font-size: 0.9375rem; }
@@ -421,7 +422,8 @@ h1, h2, p, dl, dd { margin: 0; }
 }
 
 .login-head { text-align: center; margin-bottom: 20px; }
-.login-logo { display: block; width: 160px; height: auto; margin: 0 auto 8px; }
+.login-logo { display: block; width: 120px; height: auto; margin: 0 auto 12px; }
+.login-title { font-size: 1.375rem; font-weight: 800; line-height: 1.25; margin-bottom: 4px; }
 
 .form { display: grid; gap: 16px; }
 .field { display: grid; gap: 6px; }

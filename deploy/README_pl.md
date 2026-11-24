@@ -48,7 +48,7 @@ Pierwsze uruchomienie zakłada użytkownika `yt-stats`, kopiuje pliki i tworzy `
 sudo nano /etc/yt-stats/config.json
 ```
 
-Wpisz `api_key` (opcjonalnie `api_key_fallback`), `username` i wynik `hash-password` w `password_hash`. Potem ponownie:
+Wpisz `channel_id` (ID Twojego kanału, `UC…`), `api_key` (opcjonalnie `api_key_fallback`), `username` i wynik `hash-password` w `password_hash`. Potem ponownie:
 
 ```bash
 sudo ./install.sh

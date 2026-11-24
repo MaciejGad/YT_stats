@@ -2,7 +2,7 @@
 
 **English** | [Polski](README_pl.md)
 
-A private statistics panel for the YouTube channel [@YarnPowerPL](https://www.youtube.com/@YarnPowerPL), available at `https://maciejgad.pl/yt/` after logging in.
+A private, password-protected statistics panel for any YouTube channel. You set the channel ID in the configuration; the channel's name, handle and avatar are fetched from YouTube and shown in the header. It was built for [@YarnPowerPL](https://www.youtube.com/@YarnPowerPL) and runs at `https://maciejgad.pl/yt/`, but anyone can deploy it for their own channel.
 
 It shows the list of videos with their view counts (sorted by newest or most popular) and a channel summary: subscribers, views and the number of videos. The data comes from YouTube Data API v3, with a fallback API key for when the quota runs out. The interface is in Polish.
 
@@ -14,6 +14,19 @@ It shows the list of videos with their view counts (sorted by newest or most pop
 - On the server: a systemd service behind Nginx and Cloudflare.
 
 Details: [requirements.md](requirements.md), [plan.md](plan.md), [deploy/README.md](deploy/README.md).
+
+## Configuration
+
+| Field | Meaning |
+| --- | --- |
+| `listen` | Address to listen on, e.g. `127.0.0.1:8091`. |
+| `channel_id` | The channel ID (`UC…`). Find it in YouTube Studio → Settings → Channel → Advanced settings, or with `channels.list?part=id&forHandle=@handle`. |
+| `api_key`, `api_key_fallback` | YouTube Data API v3 keys from Google Cloud Console; the fallback is optional. |
+| `username`, `password_hash` | The single account; the hash comes from `yt-stats hash-password`. |
+| `session_file` | Where sessions are stored. |
+| `web_dir` | The directory with templates and static files (`web/`). |
+
+The panel is served under `/yt/`. `web/logo.png` and `web/favicon.png` are only shown until the channel's avatar has been fetched; replace them if you like.
 
 ## Running locally
 

@@ -47,6 +47,8 @@ type env struct {
 	stderr io.Writer
 	// listen opens the listening socket; net.Listen in production.
 	listen func(network, address string) (net.Listener, error)
+	// youtubeURL replaces the YouTube Data API address; empty in production.
+	youtubeURL string
 }
 
 func main() {
@@ -139,6 +141,7 @@ func cmdServe(ctx context.Context, args []string, e env) int {
 		ChannelID:      cfg.ChannelID,
 		APIKey:         cfg.APIKey,
 		APIKeyFallback: cfg.APIKeyFallback,
+		BaseURL:        e.youtubeURL,
 		Log:            log,
 	})
 	if err != nil {
@@ -159,6 +162,11 @@ func cmdServe(ctx context.Context, args []string, e env) int {
 		return 1
 	}
 
+	cache := stats.New(yt, stats.Options{Images: yt, Log: log})
+	// One fetch at startup, so the login page shows the channel's name and
+	// avatar straight away. A failure only leaves the generic header.
+	go cache.Get(ctx)
+
 	h := web.NewHandler(web.Deps{
 		Files:    files,
 		Log:      log,
@@ -166,7 +174,7 @@ func cmdServe(ctx context.Context, args []string, e env) int {
 		PreLogin: auth.NewPreLogin(0, 0, nil),
 		Auth:     authenticator,
 		Limiter:  auth.NewLimiter(auth.LimiterOptions{}),
-		Stats:    stats.New(yt, stats.Options{Log: log}),
+		Stats:    cache,
 	})
 	log.Info("wczytano sesje", "active", sessions.Len())
 	if err := serve(ctx, ln, h, log); err != nil {

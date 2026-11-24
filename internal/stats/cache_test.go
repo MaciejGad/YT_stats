@@ -32,6 +32,7 @@ type fakeFetcher struct {
 	gate    chan struct{} // when set, Fetch waits for it to be closed
 	started chan struct{} // signalled when Fetch starts
 	waitCtx bool          // Fetch waits for the context to end
+	channel youtube.Channel
 }
 
 func (f *fakeFetcher) Fetch(ctx context.Context) (*youtube.Result, error) {
@@ -56,6 +57,7 @@ func (f *fakeFetcher) Fetch(ctx context.Context) (*youtube.Result, error) {
 	}
 	views := "100"
 	return &youtube.Result{
+		Channel:         f.channel,
 		SubscriberCount: ptr("42"),
 		ViewCount:       ptr(strings.Repeat("9", int(n))), // different on every fetch
 		Videos: []youtube.Video{

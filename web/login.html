@@ -4,16 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Logowanie — YarnPower</title>
-<link rel="icon" href="{{asset "favicon.png"}}" type="image/png">
-<link rel="apple-touch-icon" href="{{asset "logo.png"}}">
+<title>Logowanie — {{.Channel.Title}}</title>
+<link rel="icon" href="{{with .Channel.LogoURL}}{{.}}{{else}}{{asset "favicon.png"}}{{end}}">
+<link rel="apple-touch-icon" href="{{with .Channel.LogoURL}}{{.}}{{else}}{{asset "logo.png"}}{{end}}">
 <link rel="stylesheet" href="{{asset "style.css"}}">
 </head>
 <body class="login-body">
 <main class="login">
   <div class="login-card">
     <div class="login-head">
-      <img class="login-logo" src="{{asset "logo.png"}}" alt="YarnPower" width="160" height="148">
+      <img class="login-logo{{if .Channel.LogoURL}} is-avatar{{end}}" src="{{with .Channel.LogoURL}}{{.}}{{else}}{{asset "logo.png"}}{{end}}" alt="" width="120" height="120">
+      <h1 class="login-title">{{.Channel.Title}}</h1>
       <p class="brand-sub">Zaloguj się, aby zobaczyć statystyki kanału.</p>
     </div>
     {{if .Error}}<div class="banner banner-error" role="alert">{{.Error}}</div>{{end}}

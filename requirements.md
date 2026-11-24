@@ -4,7 +4,7 @@
 
 ## Goal and scope
 
-A private panel at `https://maciejgad.pl/yt/` shows current statistics for the [@YarnPowerPL](https://www.youtube.com/@YarnPowerPL) channel. It replaces the features of the existing `index.php`, `stat.php`, `functions.php` and `script.js`. The scope covers login, a channel summary and a table of videos. CSV history, charts, cron and periodic background refreshes are out of scope.
+A private panel at `https://maciejgad.pl/yt/` shows current statistics for the [@YarnPowerPL](https://www.youtube.com/@YarnPowerPL) channel. The channel is set in the configuration, so someone else can deploy the same panel for their own channel. It replaces the features of the existing `index.php`, `stat.php`, `functions.php` and `script.js`. The scope covers login, a channel summary and a table of videos. CSV history, charts, cron and periodic background refreshes are out of scope.
 
 The `old_implementation/` directory holds a copy of the old version for reference only. It is excluded from the repository by `.gitignore`.
 
@@ -21,9 +21,9 @@ The `old_implementation/` directory holds a copy of the old version for referenc
 
 - The interface is redesigned and clearly more modern than the current page. All text is in Polish and the document has `lang="pl"`.
 - The page works without horizontal scrolling from 360 px wide. We check it at 375 px (phone), 768 px (tablet) and 1280 px (desktop), and on a real phone.
-- Order from the top: a header with the YarnPower logo and the "Wyloguj" (Log out) button, the list of videos, and below it a smaller summary panel.
+- Order from the top: a header with the channel's avatar and name and the "Wyloguj" (Log out) button, the list of videos, and below it a smaller summary panel.
 - The summary panel shows subscribers, channel views, the number of videos in the list, the fetch time and the "Odśwież" button. It sticks to the bottom of the screen (it does not scroll with the list) and takes its own place under the list at the end of the page.
-- The colours refer to the logo and to yarn: the logo's navy, the yellow of the ball of yarn and a warm, woolly background. The logo has a transparent background and looks good in both themes.
+- The colours refer to yarn: navy, the yellow of a ball of yarn and a warm, woolly background. The channel's avatar is shown as a circle and looks good in both themes.
 - From 768 px the video list is a table with "Tytuł" (Title) and "Wyświetlenia" (Views) columns; numbers are right-aligned with tabular digits. Below 768 px each video is a card row with the title and the view count under it.
 - The default order is the order of the uploads playlist (newest first). The user can switch to sorting by view count, descending. Sorting happens in the browser and sends no new request.
 - Numbers are formatted in the browser using `pl-PL` (e.g. `12 345`). The JSON keeps them as digit strings.
@@ -63,7 +63,10 @@ The `old_implementation/` directory holds a copy of the old version for referenc
 
 ## Fetching data
 
-- The channel ID is `UC5711W83ebIxkC8bHjOKI7g` (the old version prepended `UC` in `functions.php`). Before deployment we confirm it with a `channels.list?forHandle=@YarnPowerPL` query.
+- The channel ID comes from the configuration (`channel_id`), so anyone can deploy the panel for their own channel. For @YarnPowerPL it is `UC5711W83ebIxkC8bHjOKI7g` (the old version prepended `UC` in `functions.php`). Before deployment we confirm it with a `channels.list?forHandle=@handle` query.
+- The channel's name, handle (`customUrl`) and avatar come from the same `channels.list` request (`part=snippet`), so they cost no extra quota. The header and the login page show them; until the first successful fetch they show a generic title and the bundled `logo.png`.
+- The avatar is downloaded by the server (only over HTTPS from Google image hosts `ggpht.com`, `googleusercontent.com`, `ytimg.com`, up to 1 MiB, JPEG/PNG/WebP/GIF recognised by content, without the API key) and served from `/yt/channel-logo`, so the page still loads nothing from external servers. It is downloaded again only when its address changes. A failed download does not fail the refresh.
+- Right after startup the application fetches the data once, so the login page knows the channel's name and avatar. After that, as before, YouTube is queried only after an authorised request.
 - Go queries YouTube Data API v3 after an authorised request if the last successful read is older than 60 seconds. Concurrent refreshes share one fetch.
 - The application reads the channel statistics and the ID of the uploads playlist. It handles every page of the playlist (the old version fetched only the first 50 videos) and fetches video statistics in batches of 50. Private and deleted videos are skipped when the API does not return their details.
 - After an error the application returns the last successful result up to 24 hours old, with status `200` and `stale: true`. For 30 seconds after an error further requests use the same state instead of retrying YouTube immediately. No result within that window means a `503` response.
@@ -87,9 +90,10 @@ The `old_implementation/` directory holds a copy of the old version for referenc
 | `POST /yt/logout` | Invalidates the session and responds `303` to `/yt/login`. |
 | `GET /yt/stat.json` | Statistics, or `401` without a valid session. |
 | `GET /yt/script.js`, `GET /yt/style.css`, `GET /yt/logo.png`, `GET /yt/favicon.png` | Static files, available without a session. |
+| `GET /yt/channel-logo` | The channel's avatar, available without a session (the login page shows it); `404` until it is downloaded. Versioned like static files. |
 
 - Every `GET` route also handles `HEAD`. Any other method on a known path returns `405` with an `Allow` header. An unknown path returns `404`.
-- The JSON keeps the existing fields `stats.subscriberCount`, `stats.viewsCount`, `videos[].videoId`, `videos[].title`, `videos[].viewCount` and `update_time`. Counters stay digit strings. A missing counter is `null`. The `stale` field says whether the result comes from the fallback read.
+- The JSON keeps the existing fields `stats.subscriberCount`, `stats.viewsCount`, `videos[].videoId`, `videos[].title`, `videos[].viewCount` and `update_time`. Counters stay digit strings. A missing counter is `null`. The `stale` field says whether the result comes from the fallback read. The `channel` field holds `title`, `handle` (may be missing), `url` and `logoVersion` (missing without an avatar).
 - `update_time` is ISO 8601 with the `Europe/Warsaw` offset, e.g. `2026-11-23T22:45:10+01:00`. The browser shows it in the `Europe/Warsaw` zone regardless of the device's zone.
 - On error the endpoint returns `{"error": "<short message>"}` with no internal details. After a `401` the script redirects to the login form.
 - All responses have the headers `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`. Nginx sets HSTS.

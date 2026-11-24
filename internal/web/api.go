@@ -66,6 +66,31 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Write(data)
 }
 
+// handleLogo serves the channel avatar downloaded from YouTube. It is public
+// like the other static files, because the login page shows it too.
+func (s *server) handleLogo(w http.ResponseWriter, r *http.Request) {
+	logo, ok := s.Stats.Logo()
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", logo.ContentType)
+	h.Set("ETag", `"`+logo.Version+`"`)
+	setAssetCache(h, r, logo.Version)
+	http.ServeContent(w, r, "", logo.ModTime, bytes.NewReader(logo.Data))
+}
+
+// setAssetCache lets a URL carrying the current version be cached forever:
+// its content never changes. Any other URL is revalidated on every use.
+func setAssetCache(h http.Header, r *http.Request, version string) {
+	if v := r.URL.Query().Get("v"); v != "" && v == version {
+		h.Set("Cache-Control", "public, max-age=31536000, immutable")
+	} else {
+		h.Set("Cache-Control", "no-cache")
+	}
+}
+
 // staticTypes are the MIME types of static files.
 var staticTypes = map[string]string{
 	".js":  "text/javascript; charset=utf-8",
@@ -89,13 +114,7 @@ func (s *server) handleStatic(name string) http.HandlerFunc {
 		h := w.Header()
 		h.Set("Content-Type", ctype)
 		h.Set("ETag", f.ETag)
-		if v := r.URL.Query().Get("v"); v != "" && v == f.Version() {
-			// A URL with the current version never changes its content: it can be
-			// cached without asking the server.
-			h.Set("Cache-Control", "public, max-age=31536000, immutable")
-		} else {
-			h.Set("Cache-Control", "no-cache")
-		}
+		setAssetCache(h, r, f.Version())
 		http.ServeContent(w, r, name, f.ModTime, bytes.NewReader(f.Content))
 	}
 }
