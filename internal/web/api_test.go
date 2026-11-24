@@ -374,3 +374,38 @@ func TestTemplateEscapesError(t *testing.T) {
 		t.Error("szablon nie escapuje danych")
 	}
 }
+
+func TestStaticVersionedCaching(t *testing.T) {
+	a := newApp(t, fastParams, auth.AuthOptions{})
+	b := a.browser()
+	url, err := a.deps.Files.AssetURL("script.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := b.do("GET", url, nil)
+	if rec.Code != 200 || rec.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
+		t.Errorf("aktualna wersja: %d %q", rec.Code, rec.Header().Get("Cache-Control"))
+	}
+	for _, u := range []string{"/yt/script.js", "/yt/script.js?v=staraWersja", "/yt/script.js?v=no_php"} {
+		rec := b.do("GET", u, nil)
+		if rec.Code != 200 || rec.Header().Get("Cache-Control") != "no-cache" {
+			t.Errorf("%s: %d %q, oczekiwano no-cache", u, rec.Code, rec.Header().Get("Cache-Control"))
+		}
+	}
+}
+
+func TestPagesUseVersionedAssets(t *testing.T) {
+	a, b := loggedIn(t)
+	panel := b.do("GET", "/yt/", nil).Body.String()
+	login := a.browser().do("GET", "/yt/login", nil).Body.String()
+	for name, body := range map[string]string{"panel": panel, "logowanie": login} {
+		for _, f := range []string{"style.css", "logo.png", "favicon.png"} {
+			if !strings.Contains(body, "/yt/"+f+"?v=") {
+				t.Errorf("%s: %s bez wersji", name, f)
+			}
+		}
+	}
+	if !strings.Contains(panel, "/yt/script.js?v=") {
+		t.Error("panel: script.js bez wersji")
+	}
+}

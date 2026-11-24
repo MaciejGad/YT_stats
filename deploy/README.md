@@ -148,3 +148,49 @@ Następnie `sudo systemctl restart yt-stats`. Jeśli nadal nie działa, dopisz `
 **`plik konfiguracji ma uprawnienia 0644`.** `sudo chmod 640 /etc/yt-stats/config.json && sudo chown root:yt-stats /etc/yt-stats/config.json`.
 
 **`odczyt pliku sesji: permission denied`.** Plik sesji utworzył root (np. `revoke-sessions` bez `runuser`). Napraw: `sudo chown yt-stats:yt-stats /var/lib/yt-stats/sessions.json*`.
+
+## 9. Nginx i Cloudflare (przełączenie /yt/)
+
+`maciejgad.pl` stoi za Cloudflare: HTTPS kończy się w Cloudflare, a Nginx dostaje ruch po HTTP na porcie 80. Dlatego:
+
+- adres klienta pochodzi z nagłówka `CF-Connecting-IP`, przyjmowanego tylko od adresów Cloudflare (`nginx/cloudflare-real-ip.sh`); bez tego limit prób logowania liczyłby wszystkich użytkowników jako kilka adresów Cloudflare,
+- po przełączeniu trzeba wyczyścić cache Cloudflare dla dawnych plików (np. `statistics.csv` był cache'owany przez 4 h).
+
+Wszystkie polecenia na serwerze, w katalogu rozpakowanej paczki.
+
+1. Kopia obecnej konfiguracji (do wycofania):
+   ```bash
+   sudo cp -p /etc/nginx/sites-available/maciejgad.pl ~/maciejgad.pl.przed-yt-stats
+   ```
+2. Lista adresów Cloudflare i fragment dla `/yt/`:
+   ```bash
+   sudo ./nginx/cloudflare-real-ip.sh
+   sudo install -m 0644 nginx/yt-stats.conf /etc/nginx/snippets/yt-stats.conf
+   ```
+3. Dołączenie fragmentu w vhoście (jedna linia po `index ...;`) i sprawdzenie:
+   ```bash
+   sudo sed -i '/^\s*index index.php index.html;/a\	include /etc/nginx/snippets/yt-stats.conf;' /etc/nginx/sites-available/maciejgad.pl
+   grep -n 'yt-stats' /etc/nginx/sites-available/maciejgad.pl
+   ```
+   `grep` musi pokazać dokładnie jedną linię.
+4. Test i przeładowanie:
+   ```bash
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+5. Cloudflare → maciejgad.pl → Caching → Configuration → Custom Purge → URL, wpisz (po jednym w linii):
+   ```
+   https://maciejgad.pl/yt/statistics.csv
+   https://maciejgad.pl/yt/stat.json
+   https://maciejgad.pl/yt/stat.php
+   https://maciejgad.pl/yt/index.php
+   https://maciejgad.pl/yt/script.js
+   https://maciejgad.pl/yt/graph_data.php
+   https://maciejgad.pl/yt/cron.sh
+   ```
+6. Na Macu: `deploy/smoke.sh` — wszystkie wiersze `ok`.
+
+**Wycofanie:**
+```bash
+sudo cp -p ~/maciejgad.pl.przed-yt-stats /etc/nginx/sites-available/maciejgad.pl
+sudo nginx -t && sudo systemctl reload nginx
+```

@@ -38,6 +38,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath \
 echo "Czas budowania: $(( $(date +%s) - start )) s (przyrostowo, z cache Go)"
 
 cp -R web "$OUT/web"
+cp -R deploy/nginx "$OUT/nginx"
 cp deploy/yt-stats.service deploy/install.sh deploy/config.server.example.json deploy/README.md "$OUT/"
 echo "$ARCH" > "$OUT/ARCH"
 echo "$VERSION" > "$OUT/VERSION"

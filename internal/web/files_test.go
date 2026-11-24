@@ -260,3 +260,57 @@ func TestRealWebDirLoads(t *testing.T) {
 		t.Fatalf("pliki w web/ nie wczytują się: %v", err)
 	}
 }
+
+func TestAssetURL(t *testing.T) {
+	dir := setupDir(t)
+	f, err := LoadFiles(dir, newLogger(io.Discard))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u1, err := f.AssetURL("script.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(u1, "/yt/script.js?v=") || len(u1) != len("/yt/script.js?v=")+16 {
+		t.Errorf("adres %q", u1)
+	}
+	write(t, dir, "script.js", "// nowa wersja", time.Now())
+	u2, _ := f.AssetURL("script.js")
+	if u1 == u2 {
+		t.Error("wersja nie zmieniła się po zmianie pliku")
+	}
+	if _, err := f.AssetURL("../config.json"); err == nil {
+		t.Error("nieznany plik powinien dać błąd")
+	}
+}
+
+func TestTemplateAssetFunction(t *testing.T) {
+	dir := setupDir(t)
+	write(t, dir, "index.html", `<script src="{{asset "script.js"}}"></script>`, time.Now().Add(-time.Hour))
+	f, err := LoadFiles(dir, newLogger(io.Discard))
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := render(t, f, "index.html")
+	if !strings.Contains(before, `src="/yt/script.js?v=`) {
+		t.Fatalf("render = %q", before)
+	}
+	// Zmiana samego skryptu (bez zmiany szablonu) daje nowy adres w HTML.
+	write(t, dir, "script.js", "// zmiana", time.Now())
+	if after := render(t, f, "index.html"); after == before {
+		t.Error("adres skryptu w HTML nie zmienił się po zmianie pliku")
+	}
+}
+
+func TestTemplateUnknownAssetFails(t *testing.T) {
+	dir := setupDir(t)
+	write(t, dir, "index.html", `{{asset "brak.js"}}`, time.Now().Add(-time.Hour))
+	f, err := LoadFiles(dir, newLogger(io.Discard))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl, _ := f.Template("index.html")
+	if err := tmpl.Execute(io.Discard, nil); err == nil {
+		t.Error("nieznany plik w asset powinien dać błąd wykonania szablonu")
+	}
+}

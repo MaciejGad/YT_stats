@@ -40,7 +40,7 @@ Katalog `old_implementation/` zawiera kopię starej wersji wyłącznie do podgl�
 - Dostęp do panelu i danych wymaga sesji. Formularze logowania i wylogowania mają ochronę CSRF.
 - Przy nieznanej nazwie użytkownika aplikacja weryfikuje hasło względem stałego, fikcyjnego hasha Argon2id, aby czas odpowiedzi nie zdradzał poprawności nazwy.
 - Hash hasła Argon2id oraz klucze YouTube API znajdują się w konfiguracji poza katalogiem publicznym. Odpowiedzi i logi nie ujawniają hasła, kluczy API ani identyfikatorów sesji. Strony logowania i chronione odpowiedzi mają `Cache-Control: no-store`.
-- Adres klienta do limitów pochodzi z `X-Real-IP` tylko wtedy, gdy połączenie przychodzi z `127.0.0.1` lub `::1`. W przeciwnym razie aplikacja używa adresu połączenia.
+- Adres klienta do limitów pochodzi z `X-Real-IP` tylko wtedy, gdy połączenie przychodzi z `127.0.0.1` lub `::1`. W przeciwnym razie aplikacja używa adresu połączenia. Nginx wypełnia `X-Real-IP` adresem z `CF-Connecting-IP` (zob. „Środowisko”).
 
 ## Limity
 
@@ -97,10 +97,11 @@ Katalog `old_implementation/` zawiera kopię starej wersji wyłącznie do podgl�
 - Aplikacja to jedna binarka Go. Szablony HTML (`index.html`, `login.html`) oraz pliki `script.js`, `style.css`, `logo.png` i `favicon.png` leżą obok niej w katalogu wskazanym w konfiguracji (`web_dir`) i nie są wkompilowane.
 - Zmiana tych plików działa bez rekompilacji i bez restartu: aplikacja wczytuje szablon ponownie, gdy zmieni się czas modyfikacji pliku. Jeżeli nowa wersja szablonu ma błąd składni, aplikacja loguje błąd i dalej używa ostatniej poprawnej wersji.
 - Przy starcie brak lub błąd któregokolwiek pliku przerywa uruchomienie z komunikatem wskazującym plik.
+- Szablony wskazują pliki statyczne przez `{{asset "nazwa"}}`, co daje adres z wersją, np. `/yt/script.js?v=1a2b…` (skrót zawartości). Zmiana pliku zmienia adres, więc ani przeglądarka, ani Cloudflare nie podają starej kopii. Adres z aktualną wersją ma `Cache-Control: public, max-age=31536000, immutable`, a adres bez wersji lub z nieaktualną wersją `no-cache`.
 
 ## Środowisko
 
-Aplikacja działa jako jeden lekki proces Go pod `systemd`. Nginx kończy HTTPS i przekazuje ruch z `/yt/` do `127.0.0.1:8091` z zachowaniem prefiksu. Binarkę na Linuksa budujemy na Macu. Binarka zawiera bazę stref czasowych (`time/tzdata`), więc nie zależy od `/usr/share/zoneinfo` na serwerze. Aplikacja nie wymaga bazy danych. Zużycie RAM w spoczynku, podczas logowania i pobierania oraz czas kompilacji mierzymy przed odbiorem.
+Aplikacja działa jako jeden lekki proces Go pod `systemd`. Domena stoi za Cloudflare: HTTPS kończy się w Cloudflare, który łączy się z Nginx po HTTP. Nginx przekazuje ruch z `/yt/` do `127.0.0.1:8091` z zachowaniem prefiksu i ustawia `X-Real-IP` na prawdziwy adres klienta z `CF-Connecting-IP`, przyjmowanego tylko od adresów Cloudflare (moduł `real_ip`). Po przełączeniu czyścimy cache Cloudflare dla dawnych plików z `/yt/`. Binarkę na Linuksa budujemy na Macu. Binarka zawiera bazę stref czasowych (`time/tzdata`), więc nie zależy od `/usr/share/zoneinfo` na serwerze. Aplikacja nie wymaga bazy danych. Zużycie RAM w spoczynku, podczas logowania i pobierania oraz czas kompilacji mierzymy przed odbiorem.
 
 Lokalnie aplikację testujemy po zwykłym HTTP na `http://localhost:8091/yt/` w Chrome lub Firefox. Te przeglądarki traktują `localhost` jako bezpieczny kontekst i przyjmują ciasteczko z atrybutem `Secure`. Safari tego nie robi, więc lokalnie go nie używamy.
 

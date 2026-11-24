@@ -88,8 +88,14 @@ func (s *server) handleStatic(name string) http.HandlerFunc {
 		}
 		h := w.Header()
 		h.Set("Content-Type", ctype)
-		h.Set("Cache-Control", "no-cache")
 		h.Set("ETag", f.ETag)
+		if v := r.URL.Query().Get("v"); v != "" && v == f.Version() {
+			// Adres z aktualną wersją nigdy nie zmieni treści: można go
+			// trzymać w cache bez pytania serwera.
+			h.Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			h.Set("Cache-Control", "no-cache")
+		}
 		http.ServeContent(w, r, name, f.ModTime, bytes.NewReader(f.Content))
 	}
 }

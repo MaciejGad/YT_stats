@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>Logowanie — YarnPower</title>
-<link rel="icon" href="/yt/favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="/yt/logo.png">
-<link rel="stylesheet" href="/yt/style.css">
+<link rel="icon" href="{{asset "favicon.png"}}" type="image/png">
+<link rel="apple-touch-icon" href="{{asset "logo.png"}}">
+<link rel="stylesheet" href="{{asset "style.css"}}">
 </head>
 <body class="login-body">
 <main class="login">
   <div class="login-card">
     <div class="login-head">
-      <img class="login-logo" src="/yt/logo.png" alt="YarnPower" width="160" height="148">
+      <img class="login-logo" src="{{asset "logo.png"}}" alt="YarnPower" width="160" height="148">
       <p class="brand-sub">Zaloguj się, aby zobaczyć statystyki kanału.</p>
     </div>
     {{if .Error}}<div class="banner banner-error" role="alert">{{.Error}}</div>{{end}}

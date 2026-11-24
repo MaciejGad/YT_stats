@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -203,7 +204,10 @@ func (f *Files) loadTemplate(name string) (*templateEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	t, err := template.New(name).Option("missingkey=error").Parse(string(data))
+	t, err := template.New(name).
+		Funcs(template.FuncMap{"asset": f.AssetURL}).
+		Option("missingkey=error").
+		Parse(string(data))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", name, err)
 	}
@@ -223,4 +227,21 @@ func (f *Files) loadStatic(name string) (*StaticFile, error) {
 		ETag:    `"` + hex.EncodeToString(sum[:8]) + `"`,
 		stamp:   stamp,
 	}, nil
+}
+
+// AssetURL zwraca adres pliku statycznego z wersją, np. /yt/script.js?v=1a2b…
+// Wersja to skrót zawartości, więc każda zmiana pliku daje nowy adres
+// i ani przeglądarka, ani Cloudflare nie podadzą starej kopii.
+// W szablonach: {{asset "script.js"}}.
+func (f *Files) AssetURL(name string) (string, error) {
+	s, err := f.Static(name)
+	if err != nil {
+		return "", err
+	}
+	return "/yt/" + name + "?v=" + s.Version(), nil
+}
+
+// Version zwraca wersję pliku (ETag bez cudzysłowów).
+func (s *StaticFile) Version() string {
+	return strings.Trim(s.ETag, `"`)
 }

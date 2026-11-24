@@ -146,14 +146,15 @@ config.example.json  przykładowa konfiguracja z pustymi wartościami
 
 ## 6. Przełącz Nginx, zweryfikuj i zakończ migrację
 
-- Zachowaj poprzednią konfigurację Nginx i katalog starej aplikacji. W wirtualnym hoście HTTPS ustaw `location = /yt { return 301 /yt/; }` oraz osobną lokalizację `location ^~ /yt/` z `proxy_pass http://127.0.0.1:8091;`. Brak ścieżki po adresie proxy zachowuje prefiks `/yt/`. Prefiks `^~` zapewnia pierwszeństwo przed ogólnymi regułami dla PHP i JS w obecnym hoście. Przekaż `Host`, `X-Forwarded-Proto` oraz `X-Real-IP $remote_addr` (nadpisany, nie dopisany). Dodaj `Strict-Transport-Security`. Sprawdź, że host na porcie 80 przekierowuje `/yt/` na HTTPS.
-- Wykonaj `nginx -t`, przeładuj konfigurację i przejdź kryteria odbioru.
-- Po potwierdzeniu działania usuń wpis starego crona (`cron.sh` / `cron.php`), jeśli istnieje, i przenieś dawne pliki poza katalog publiczny. Przed wyłączeniem PHP-FPM na całym serwerze sprawdź pozostałe strony na serwerze, które mogą korzystać z PHP.
-- Jeżeli po przełączeniu panel nie spełnia warunków odbioru, przywróć poprzednie pliki i konfigurację hosta, wykonaj `nginx -t` i ponownie przeładuj Nginx. Trzymaj kopię poprzedniej konfiguracji wraz z prywatną kopią starych plików do czasu zakończenia odbioru.
+- Domena stoi za Cloudflare (HTTPS kończy się tam, do Nginx ruch trafia po HTTP na port 80). `deploy/nginx/cloudflare-real-ip.sh` tworzy `/etc/nginx/snippets/cloudflare-real-ip.conf` z oficjalnej listy adresów Cloudflare (`set_real_ip_from` + `real_ip_header CF-Connecting-IP`), żeby `$remote_addr` był adresem użytkownika.
+- `deploy/nginx/yt-stats.conf` trafia do `/etc/nginx/snippets/yt-stats.conf` i jest dołączany jedną linią `include` w bloku `server` dla `maciejgad.pl`. Zawiera `location = /yt { return 301 https://$host/yt/; }` oraz `location ^~ /yt/` z `proxy_pass http://127.0.0.1:8091;`. Brak ścieżki po adresie proxy zachowuje prefiks `/yt/`, a `^~` ma pierwszeństwo przed regułami dla `.php` i plików statycznych. `Host`, `X-Real-IP`, `X-Forwarded-For` (nadpisane) i `X-Forwarded-Proto: https`, HSTS.
+- Przed zmianą kopia vhosta do `~/maciejgad.pl.przed-yt-stats`. Potem `nginx -t`, przeładowanie i wyczyszczenie cache Cloudflare dla dawnych plików z `/yt/` (np. `statistics.csv` był cache'owany 4 h).
+- Po potwierdzeniu działania usuń wpis starego crona, jeśli istnieje. Dawne pliki są w repozytorium `HomePage` (`html/yt/`), wdrażanym przez `git pull`, więc usuwamy je tam (po prywatnej kopii `statistics.csv`), a nie tylko na serwerze. Przed wyłączeniem PHP-FPM na całym serwerze sprawdź pozostałe strony, które mogą korzystać z PHP.
+- Jeżeli po przełączeniu panel nie spełnia warunków odbioru, przywróć kopię vhosta, wykonaj `nginx -t` i przeładuj Nginx. Kroki są w `deploy/README.md`, sekcja 9.
 
 **Testy automatyczne**
 - `nginx -t` przed każdym przeładowaniem.
-- Skrypt `deploy/smoke.sh` uruchamiany z Maca (`curl`) sprawdzający: `/yt` → `301`; `/yt/` bez sesji → `303`; `/yt/stat.json` bez sesji → `401`; stare adresy `/yt/index.php`, `/yt/stat.php`, `/yt/functions.php`, `/yt/require_auth.php`, `/yt/graph_data.php`, `/yt/cron.php`, `/yt/cron.sh`, `/yt/statistics.csv` → `404`; obecność CSP, `nosniff`, HSTS; `http://` → przekierowanie na `https://`.
+- Skrypt `deploy/smoke.sh` uruchamiany z Maca (`curl`, nagłówki bez treści) sprawdzający: `/yt` → `301`; `/yt/` bez sesji → `303`; `/yt/stat.json` bez sesji → `401`; stare adresy `/yt/index.php`, `/yt/stat.php`, `/yt/functions.php`, `/yt/require_auth.php`, `/yt/graph_data.php`, `/yt/cron.php`, `/yt/cron.sh`, `/yt/statistics.csv` → `404`; obecność CSP, `nosniff`, HSTS; `http://` → przekierowanie na `https://`.
 
 **Scenariusze manualne** (kryteria odbioru)
 - Pierwsze logowanie z „Zapamiętaj” na komputerze; zamknięcie przeglądarki i ponowne wejście bez hasła.
