@@ -7,3 +7,6 @@ old_implementation/
 /data/
 
 .DS_Store
+
+# Paczki wdrożeniowe
+/dist/

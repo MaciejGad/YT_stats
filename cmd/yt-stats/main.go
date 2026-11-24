@@ -5,6 +5,7 @@
 //	yt-stats [-config ścieżka]                 uruchamia serwer
 //	yt-stats hash-password                     tworzy hash Argon2id hasła
 //	yt-stats revoke-sessions [-config ścieżka] usuwa wszystkie sesje
+//	yt-stats check-config [-config ścieżka]    sprawdza konfigurację i pliki
 package main
 
 import (
@@ -68,6 +69,8 @@ func run(ctx context.Context, args []string, e env) int {
 			return cmdHashPassword(args[1:], e.stdin, e.stdout, e.stderr)
 		case "revoke-sessions":
 			return cmdRevokeSessions(args[1:], e)
+		case "check-config":
+			return cmdCheckConfig(args[1:], e)
 		case "version":
 			fmt.Fprintln(e.stdout, version)
 			return 0
@@ -87,6 +90,8 @@ Użycie:
   yt-stats hash-password       tworzy hash Argon2id hasła do pola password_hash
   yt-stats revoke-sessions [-config ścieżka]
                                usuwa wszystkie sesje (przy zatrzymanej usłudze)
+  yt-stats check-config [-config ścieżka]
+                               sprawdza konfigurację i pliki interfejsu
   yt-stats version             wypisuje wersję
 `, version, defaultConfigPath)
 }
@@ -244,4 +249,30 @@ func serve(ctx context.Context, ln net.Listener, h http.Handler, log *slog.Logge
 	}
 	log.Info("serwer zatrzymany")
 	return nil
+}
+
+// cmdCheckConfig sprawdza konfigurację i pliki interfejsu bez uruchamiania
+// serwera i bez blokowania pliku sesji, więc działa obok pracującej usługi.
+func cmdCheckConfig(args []string, e env) int {
+	fs := flag.NewFlagSet("check-config", flag.ContinueOnError)
+	fs.SetOutput(e.stderr)
+	configPath := fs.String("config", defaultConfigPath, "ścieżka pliku konfiguracji")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(e.stderr, "check-config: nieoczekiwany argument %q\n", fs.Arg(0))
+		return 2
+	}
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		fmt.Fprintf(e.stderr, "%s: %v\n", *configPath, err)
+		return 1
+	}
+	if _, err := web.LoadFiles(cfg.WebDir, slog.New(slog.DiscardHandler)); err != nil {
+		fmt.Fprintf(e.stderr, "pliki interfejsu: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(e.stdout, "Konfiguracja %s jest poprawna.\n", *configPath)
+	return 0
 }

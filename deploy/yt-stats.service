@@ -1,0 +1,52 @@
+# Usługa panelu statystyk YarnPower.
+# Instalacja: deploy/install.sh (kopiuje plik do /etc/systemd/system/).
+[Unit]
+Description=YarnPower - panel statystyk YouTube
+Documentation=file:///opt/yt-stats/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yt-stats
+Group=yt-stats
+ExecStart=/opt/yt-stats/yt-stats -config /etc/yt-stats/config.json
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+
+# Katalog stanu /var/lib/yt-stats (plik sesji) zakłada i posiada systemd.
+StateDirectory=yt-stats
+StateDirectoryMode=0700
+UMask=0077
+
+# Pamięć: twardy limit i miękki limit dla odśmiecacza Go.
+MemoryMax=128M
+Environment=GOMEMLIMIT=96MiB
+
+# Utwardzenie. Jeśli usługa w kontenerze nie startuje ze statusem
+# 226/NAMESPACE, zobacz sekcję „Rozwiązywanie problemów” w deploy/README.md.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/opt/yt-stats /etc/yt-stats
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

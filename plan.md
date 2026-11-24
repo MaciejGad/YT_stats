@@ -127,7 +127,7 @@ config.example.json  przykładowa konfiguracja z pustymi wartościami
 
 - Na Macu uruchom `go test ./...`, `go test -race ./...` i `go vet ./...`.
 - Na Mikrusie sprawdź `uname -m`. Dla `x86_64` zbuduj na Macu poleceniem `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.version=$(git describe --always --dirty)" -o yt-stats ./cmd/yt-stats`. Dla `aarch64` ustaw `GOARCH=arm64`. Zmierz czas kompilacji (`time`) dla budowania od zera (`go clean -cache`) i przyrostowego.
-- Skopiuj binarkę do `/opt/yt-stats/yt-stats`, a katalog `web/` do `/opt/yt-stats/web/`. Utwórz dedykowanego użytkownika systemowego `yt-stats`, konfigurację w `/etc/yt-stats/config.json` (właściciel `root:yt-stats`, `0640`) oraz katalog stanu `/var/lib/yt-stats/` (`StateDirectory=`).
+- Paczkę buduje `deploy/build.sh amd64|arm64` (testy, binarka, `web/`, plik usługi, `install.sh`), a instaluje `sudo ./install.sh` na serwerze; szczegóły w `deploy/README.md`. Skrypt kopiuje binarkę do `/opt/yt-stats/yt-stats`, a katalog `web/` do `/opt/yt-stats/web/`, zachowując poprzednie wersje jako `*.prev`. Utwórz dedykowanego użytkownika systemowego `yt-stats`, konfigurację w `/etc/yt-stats/config.json` (właściciel `root:yt-stats`, `0640`) oraz katalog stanu `/var/lib/yt-stats/` (`StateDirectory=`).
 - Skonfiguruj `deploy/yt-stats.service`: `Restart=on-failure`, `User=yt-stats`, `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes`, `PrivateDevices=yes`, `StateDirectory=yt-stats`, `ReadOnlyPaths=/opt/yt-stats`, `MemoryMax=128M`. Uruchom serwis na `127.0.0.1:8091`.
 - Wygeneruj hash hasła poleceniem `yt-stats hash-password` i wpisz do konfiguracji.
 

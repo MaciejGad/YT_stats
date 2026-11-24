@@ -1,0 +1,10 @@
+{
+  "listen": "127.0.0.1:8091",
+  "channel_id": "UC5711W83ebIxkC8bHjOKI7g",
+  "api_key": "",
+  "api_key_fallback": "",
+  "username": "",
+  "password_hash": "",
+  "session_file": "/var/lib/yt-stats/sessions.json",
+  "web_dir": "/opt/yt-stats/web"
+}

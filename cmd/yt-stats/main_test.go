@@ -550,3 +550,64 @@ func TestSecondInstanceRefusesSessionFile(t *testing.T) {
 		t.Errorf("stderr: %s", errOut)
 	}
 }
+
+// --- check-config ---
+
+func TestCheckConfigOK(t *testing.T) {
+	path := writeValidConfig(t, "../../web")
+	// Działa także przy zablokowanym pliku sesji (pracująca usługa).
+	store, err := auth.OpenStore(sessionFileOf(t, path), auth.StoreOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	e, out, errOut := testEnv("")
+	if code := run(context.Background(), []string{"check-config", "-config", path}, e); code != 0 {
+		t.Fatalf("kod %d: %s", code, errOut)
+	}
+	if !strings.Contains(out.String(), "poprawna") {
+		t.Errorf("wyjście: %s", out)
+	}
+}
+
+func TestCheckConfigErrors(t *testing.T) {
+	e, _, errOut := testEnv("")
+	if code := run(context.Background(), []string{"check-config", "-config", "../../config.example.json"}, e); code != 1 {
+		t.Errorf("przykładowa konfiguracja: kod %d", code)
+	}
+	if !strings.Contains(errOut.String(), "brak pola api_key") {
+		t.Errorf("stderr: %s", errOut)
+	}
+	path := writeValidConfig(t, filepath.Join(t.TempDir(), "brak"))
+	if code := run(context.Background(), []string{"check-config", "-config", path}, e); code != 1 {
+		t.Errorf("brak web_dir: kod %d", code)
+	}
+	if code := run(context.Background(), []string{"check-config", "-x"}, e); code != 2 {
+		t.Errorf("nieznana flaga: kod %d", code)
+	}
+	if code := run(context.Background(), []string{"check-config", "nadmiarowy"}, e); code != 2 {
+		t.Errorf("nadmiarowy argument: kod %d", code)
+	}
+}
+
+func TestServerConfigExampleShape(t *testing.T) {
+	data, err := os.ReadFile("../../deploy/config.server.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg map[string]string
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"listen":       "127.0.0.1:8091",
+		"channel_id":   "UC5711W83ebIxkC8bHjOKI7g",
+		"session_file": "/var/lib/yt-stats/sessions.json",
+		"web_dir":      "/opt/yt-stats/web",
+	}
+	for k, v := range want {
+		if cfg[k] != v {
+			t.Errorf("%s = %q, oczekiwano %q", k, cfg[k], v)
+		}
+	}
+}
